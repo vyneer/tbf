@@ -1,0 +1,25 @@
+name: Twitch Playlist Bruteforcer
+args:
+    - verbose:
+        short: v
+        help: Shows more info
+    - streamer:
+        required: true
+        takes_value: true
+        help: Streamer name
+        index: 1
+    - id:
+        required: true
+        takes_value: true
+        help: VOD id
+        index: 2
+    - from:
+        short: f
+        required: true
+        takes_value: true
+        help: First timestamp
+    - to:
+        short: t
+        required: true
+        takes_value: true
+        help: Last timestamp

@@ -1,0 +1,45 @@
+{
+	// Use IntelliSense to learn about possible attributes.
+	// Hover to view descriptions of existing attributes.
+	// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug executable 'twitchbruteforce-rs'",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=twitchbruteforce-rs",
+					"--package=twitchbruteforce-rs"
+				],
+				"filter": {
+					"name": "twitchbruteforce-rs",
+					"kind": "bin"
+				}
+			},
+			"args": ["zizaran", "571700178", "-f", "1499799463", "-t", "1499799798"],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "Debug unit tests in executable 'twitchbruteforce-rs'",
+			"cargo": {
+				"args": [
+					"test",
+					"--no-run",
+					"--bin=twitchbruteforce-rs",
+					"--package=twitchbruteforce-rs"
+				],
+				"filter": {
+					"name": "twitchbruteforce-rs",
+					"kind": "bin"
+				}
+			},
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

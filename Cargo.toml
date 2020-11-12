@@ -1,0 +1,22 @@
+[package]
+name = "twitchbruteforce-rs"
+description = "Finds vod playlists on twitch."
+version = "0.1.0"
+authors = ["vyneer <vyneer@protonmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+error-chain = "0.12.4"
+log = "0.4"
+clap = { version = "2.33.3", features = ["yaml"] }
+env_logger = "0.7.1"
+reqwest = { version = "0.10", features = ["blocking"] }
+rayon = "1.5"
+rust-crypto = "0.2.36"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 'z'  # Optimize for size.
