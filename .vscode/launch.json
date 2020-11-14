@@ -19,7 +19,43 @@
 					"kind": "bin"
 				}
 			},
-			"args": ["zizaran", "571700178", "-f", "1499799463", "-t", "1499799798"],
+			"args": [],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "exact",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=twitchbruteforce-rs",
+					"--package=twitchbruteforce-rs"
+				],
+				"filter": {
+					"name": "twitchbruteforce-rs",
+					"kind": "bin"
+				}
+			},
+			"args": ["exact", "destiny", "40453430382", "1605211333"],
+			"cwd": "${workspaceFolder}"
+		},
+		{
+			"type": "lldb",
+			"request": "launch",
+			"name": "bruteforce",
+			"cargo": {
+				"args": [
+					"build",
+					"--bin=twitchbruteforce-rs",
+					"--package=twitchbruteforce-rs"
+				],
+				"filter": {
+					"name": "twitchbruteforce-rs",
+					"kind": "bin"
+				}
+			},
+			"args": ["bruteforce", "destiny", "40453430382", "1605211323", "1605211343"],
 			"cwd": "${workspaceFolder}"
 		},
 		{

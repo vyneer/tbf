@@ -1,25 +1,49 @@
 name: Twitch Playlist Bruteforcer
-args:
-    - verbose:
-        short: v
-        help: Shows more info
-    - streamer:
-        required: true
-        takes_value: true
-        help: Streamer name
-        index: 1
-    - id:
-        required: true
-        takes_value: true
-        help: VOD id
-        index: 2
-    - from:
-        short: f
-        required: true
-        takes_value: true
-        help: First timestamp
-    - to:
-        short: t
-        required: true
-        takes_value: true
-        help: Last timestamp
+subcommands:
+    - bruteforce:
+        about: Goes over a range of timestamps, looking for a usable/working m3u8 URL
+        args:
+            - verbose:
+                short: v
+                help: Shows more info
+            - username:
+                required: true
+                takes_value: true
+                help: Streamer's username (string)
+                index: 1
+            - id:
+                required: true
+                takes_value: true
+                help: VOD/broadcast ID (integer)
+                index: 2
+            - from:
+                required: true
+                takes_value: true
+                help: First timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
+                index: 3
+            - to:
+                required: true
+                takes_value: true
+                help: Last timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
+                index: 4
+    - exact:
+        about: Combines all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL
+        args:
+            - verbose:
+                short: v
+                help: Shows more info
+            - username:
+                required: true
+                takes_value: true
+                help: Streamer's username (string)
+                index: 1
+            - id:
+                required: true
+                takes_value: true
+                help: VOD/broadcast ID (integer)
+                index: 2
+            - stamp:
+                required: true
+                takes_value: true
+                help: A timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
+                index: 3
