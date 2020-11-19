@@ -1,5 +1,5 @@
 [package]
-name = "twitchbruteforce-rs"
+name = "tbf"
 description = "Finds VOD playlists on Twitch."
 version = "0.1.0"
 authors = ["vyneer <vyneer@protonmail.com>"]
