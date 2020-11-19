@@ -1,6 +1,6 @@
 [package]
 name = "twitchbruteforce-rs"
-description = "Finds vod playlists on twitch."
+description = "Finds VOD playlists on Twitch."
 version = "0.1.0"
 authors = ["vyneer <vyneer@protonmail.com>"]
 edition = "2018"
@@ -21,6 +21,5 @@ url = "2.2.0"
 indicatif = {version = "*", features = ["rayon"]}
 
 [profile.release]
-codegen-units = 1
 lto = true
-opt-level = 'z'  # Optimize for size.
+opt-level = 3
