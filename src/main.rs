@@ -27,8 +27,8 @@ fn check_availability(url: &str) {
     let parsed = Url::parse(url).unwrap();
     let segments = parsed.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
     if segments[segments.len()-1] == "index-dvr.m3u8" {
-        let url_normal = format!("https://vod-secure.twitch.tv{}1.ts", parsed.path().split_at(61).0);
-        let url_muted = format!("https://vod-secure.twitch.tv{}1-muted.ts", parsed.path().split_at(61).0);
+        let url_normal = format!("https://vod-secure.twitch.tv{}/1.ts", parsed.path().split_at(61).0);
+        let url_muted = format!("https://vod-secure.twitch.tv{}/1-muted.ts", parsed.path().split_at(61).0);
         let res_normal = blocking::get(url_normal.as_str()).unwrap();
         let res_muted = blocking::get(url_muted.as_str()).unwrap();
         if res_normal.status() == 200 || res_muted.status() == 200 {
