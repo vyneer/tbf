@@ -1,7 +1,7 @@
 [package]
 name = "tbf"
 description = "Finds VOD playlists on Twitch."
-version = "0.1.0"
+version = "0.2.0"
 authors = ["vyneer <vyneer@protonmail.com>"]
 edition = "2018"
 
@@ -17,8 +17,8 @@ rayon = "1.5"
 rust-crypto = "0.2.36"
 chrono = { version = "0.4", features = ["unstable-locales"] }
 regex = "1"
-url = "2.2.0"
 indicatif = {version = "*", features = ["rayon"]}
+dont_disappear = "3.0.1"
 
 [profile.release]
 lto = true

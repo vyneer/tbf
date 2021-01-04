@@ -10,9 +10,15 @@ use chrono::prelude::*;
 use std::io::stdin;
 use regex::Regex;
 use reqwest::blocking;
-use url::Url;
 use indicatif::ParallelProgressIterator;
 use std::convert::TryFrom;
+
+#[derive(Debug)]
+struct TwitchURL {
+    full_url: String,
+    hash: String,
+    timestamp: i64,
+}
 
 fn trim_newline(s: &mut String) {
     if s.ends_with('\n') {
@@ -23,20 +29,21 @@ fn trim_newline(s: &mut String) {
     }
 }
 
-fn check_availability(url: &str) {
-    let parsed = Url::parse(url).unwrap();
-    let segments = parsed.path_segments().map(|c| c.collect::<Vec<_>>()).unwrap();
-    if segments[segments.len()-1] == "index-dvr.m3u8" {
-        let url_normal = format!("https://vod-secure.twitch.tv{}/1.ts", parsed.path().split_at(61).0);
-        let url_muted = format!("https://vod-secure.twitch.tv{}/1-muted.ts", parsed.path().split_at(61).0);
-        let res_normal = blocking::get(url_normal.as_str()).unwrap();
-        let res_muted = blocking::get(url_muted.as_str()).unwrap();
-        if res_normal.status() == 200 || res_muted.status() == 200 {
-            info!("This VOD is available for watching/downloading! :)")
-        } else {
-            info!("This VOD has been deleted from Twitch servers :(")
+fn check_availability(hash: &String, username: &str, broadcast_id: i64, timestamp: &i64) -> Vec<String> {
+    let mut urls: Vec<String> = Vec::new();
+    let mut valid_urls: Vec<String> = Vec::new();
+    urls.push(format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp));
+    urls.push(format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp));
+    urls.push(format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp));
+    urls.push(format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp));
+    urls.push(format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp));
+    urls.push(format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp));
+    for url in urls {
+        if blocking::get(url.as_str()).unwrap().status() == 200 {
+            valid_urls.push(url);
         }
     }
+    valid_urls
 }
 
 fn parse_timestamp(timestamp: &str) -> i64 {
@@ -70,25 +77,51 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
 
     let final_url_check = AtomicBool::new(false);
     let final_url_atomic = Arc::new(Mutex::new(String::new()));
-    let mut initial_url_vec: Vec<String> = Vec::new();
+    let final_hash_atomic = Arc::new(Mutex::new(String::new()));
+    let final_number_atomic = Arc::new(Mutex::new(0));
+    let mut initial_url_vec_vodsecure: Vec<TwitchURL> = Vec::new();
+    let mut initial_url_vec_cloudfront1: Vec<TwitchURL> = Vec::new();
+    let mut initial_url_vec_cloudfront2: Vec<TwitchURL> = Vec::new();
     let client = blocking::Client::new();
     info!("Starting!");
     for number in number1..number2+1 {
         let mut hasher = Sha1::new();
         hasher.input_str(format!("{}_{}_{}", username, vod, number).as_str());
         let hex = hasher.result_str();
-        initial_url_vec.push(format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number));
+        initial_url_vec_vodsecure.push(TwitchURL {
+            full_url: format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront1.push(TwitchURL {
+            full_url: format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
     }
+    let all_formats_vec: Vec<Vec<TwitchURL>> = vec![initial_url_vec_vodsecure, initial_url_vec_cloudfront1, initial_url_vec_cloudfront2];
+    let all_formats_vec: Vec<TwitchURL> = all_formats_vec.into_iter().flatten().collect();
     debug!("Finished making urls.");
-    let vec_len_u64 = u64::try_from(initial_url_vec.len()).unwrap();
-    initial_url_vec.par_iter().progress_count(vec_len_u64).for_each( |url| {
+    let vec_len_u64 = u64::try_from(all_formats_vec.len()).unwrap();
+    all_formats_vec.par_iter().progress_count(vec_len_u64).for_each( |url| {
         if !final_url_check.load(Ordering::SeqCst) {
             let final_url_atomic = Arc::clone(&final_url_atomic);
-            let res = client.get(&url.clone()).send().expect("Error");
+            let final_hash_atomic = Arc::clone(&final_hash_atomic);
+            let final_number_atomic = Arc::clone(&final_number_atomic);
+            let res = client.get(&url.full_url.clone()).send().expect("Error");
             if res.status() == 200 {
                 final_url_check.store(true, Ordering::SeqCst);
                 let mut final_url = final_url_atomic.lock().unwrap();
-                *final_url = url.to_string();
+                let mut final_hash = final_hash_atomic.lock().unwrap();
+                let mut final_number = final_number_atomic.lock().unwrap();
+                *final_url = url.full_url.to_string();
+                *final_hash = url.hash.to_string();
+                *final_number = url.timestamp;
                 debug!("Got it! - {:?}", url);
             } else if res.status() == 403 {
                 debug!("Still going - {:?}", url);
@@ -97,11 +130,21 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
             }
         }
     });
-
+    
     let final_url = &*final_url_atomic.lock().unwrap();
+    let final_hash = &*final_hash_atomic.lock().unwrap();
+    let final_number = &*final_number_atomic.lock().unwrap();
     if !final_url.is_empty() {
-        info!("Got the URL! - {}", final_url);
-        check_availability(final_url);
+        let valid_urls = check_availability(final_hash, username, vod, final_number);
+        if !valid_urls.is_empty() {
+            info!("Got the URL and it was available on Twitch servers. Here are the valid URLs:");
+            for url in valid_urls {
+                info!("{}", url);
+            }
+        } else {
+            info!("Got the URL and it was NOT available on Twitch servers :(");
+            info!("Here's the URL for debug purposes - {}", final_url);
+        }
     } else {
         info!("Couldn't find anything :(");
     }
@@ -119,9 +162,16 @@ fn exact(username: &str, vod: i64, initial_stamp: &str, verbose: bool) {
     let mut hasher = Sha1::new();
     hasher.input_str(format!("{}_{}_{}", username, vod, number).as_str());
     let hex = hasher.result_str();
-    let final_url = format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number);
-    info!("Made the URL! - {}", final_url);
-    check_availability(final_url.as_str());
+    let valid_urls = check_availability(&hex[0..20].to_string(), username, vod, &number);
+    if !valid_urls.is_empty() {
+        info!("Got the URL and it was available on Twitch servers. Here are the valid URLs:");
+        for url in valid_urls {
+            info!("{}", url);
+        }
+    } else {
+        info!("Got the URL and it was NOT available on Twitch servers :(");
+        info!("Here's the URL for debug purposes - https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20].to_string(), username, vod, &number);
+    }
 }
 
 fn interface() {
@@ -151,6 +201,7 @@ fn interface() {
             trim_newline(&mut initial_stamp);
 
             exact(username.as_str(), vod.parse::<i64>().unwrap(), initial_stamp.as_str(), false);
+            dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
         },
         "2" => {
             let mut username = String::new();
@@ -172,6 +223,7 @@ fn interface() {
             trim_newline(&mut initial_to_stamp);
 
             bruteforcer(username.as_str(), vod.parse::<i64>().unwrap(), initial_from_stamp.as_str(), initial_to_stamp.as_str(), false);
+            dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
         }
         _ => {}
     }
