@@ -1,7 +1,7 @@
 [package]
 name = "tbf"
 description = "Finds VOD playlists on Twitch."
-version = "0.2.0"
+version = "0.3.0"
 authors = ["vyneer <vyneer@protonmail.com>"]
 edition = "2018"
 
@@ -19,6 +19,12 @@ chrono = { version = "0.4", features = ["unstable-locales"] }
 regex = "1"
 indicatif = {version = "*", features = ["rayon"]}
 dont_disappear = "3.0.1"
+scraper = "0.12.0"
+url = "2.2.0"
+gql_client = "0.2.1"
+serde = { version = "1.0.118", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "0.2", features = ["full"] }
 
 [profile.release]
 lto = true

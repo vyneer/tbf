@@ -29,6 +29,22 @@ Combines all the parts (streamer's username, VOD/broadcast ID and a timestamp) i
 
 Goes over a range of timestamps, looking for a usable/working m3u8 URL and checks whether the VOD is available.
 
+### link
+
+```tbf link [FLAGS] <url>```
+
+```tbf link https://twitchtracker.com/destiny/streams/41402441870```
+
+The same as the Exact mode, but gets all the info from a TwitchTracker URL.
+
+### clip
+
+```tbf clip [FLAGS] <slug>```
+
+```tbf clip SmokyHomelyIguanaAllenHuhu```
+
+Gets the m3u8 from a clip with TwitchTracker's help.
+
 ## Flags
 
 ### -h, --help

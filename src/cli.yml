@@ -47,3 +47,23 @@ subcommands:
                 takes_value: true
                 help: A timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
                 index: 3
+    - link:
+        about: The same as the Exact mode, but gets all the info from a TwitchTracker URL
+        args:
+            - verbose:
+                short: v
+                help: Shows more info
+            - url:
+                required: true
+                takes_value: true
+                help: TwitchTracker URL
+    - clip:
+        about: Gets the m3u8 from a clip with TwitchTracker's help
+        args:
+            - verbose:
+                short: v
+                help: Shows more info
+            - slug:
+                required: true
+                takes_value: true
+                help: Twitch clip slug
