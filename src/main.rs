@@ -76,8 +76,7 @@ fn trim_newline(s: &mut String) {
     }
 }
 
-#[tokio::main]
-async fn find_bid_from_clip(slug: String) -> (String, i64) {
+fn find_bid_from_clip(slug: String) -> (String, i64) {
     let endpoint = "https://gql.twitch.tv/gql";
     let mut headers = HashMap::new();
     headers.insert("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko");
