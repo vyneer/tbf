@@ -31,9 +31,9 @@ Goes over a range of timestamps, looking for a usable/working m3u8 URL and check
 
 ### clipforce
 
-```tbf clipforce [FLAGS] <username> <id> <from> <to>```
+```tbf clipforce [FLAGS] <id> <start> <end>```
 
-```tbf clipforce 39700667438 1605781694 1605781894```
+```tbf clipforce 39700667438 0 3600```
 
 Goes over a range of timestamps, looking for clips in a VOD.
 
