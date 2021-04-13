@@ -6,6 +6,9 @@ subcommands:
             - verbose:
                 short: v
                 help: Shows more info
+            - progressbar:
+                short: p
+                help: Shows the progress bar if enabled (the progress bar slightly slows down the processing)
             - username:
                 required: true
                 takes_value: true
@@ -73,6 +76,9 @@ subcommands:
             - verbose:
                 short: v
                 help: Shows more info
+            - progressbar:
+                short: p
+                help: Shows the progress bar if enabled (the progress bar slightly slows down the processing)
             - id:
                 required: true
                 takes_value: true

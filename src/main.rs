@@ -1,17 +1,15 @@
-use log::{info, debug, error};
+use log::{info, debug};
 use clap::{load_yaml, crate_authors, crate_description, crate_version, App};
 use rayon::prelude::*;
 use env_logger::Env;
 use crypto::digest::Digest;
 use crypto::sha1::Sha1;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use chrono::prelude::*;
 use std::io::stdin;
 use regex::Regex;
 use reqwest::{blocking, header::{HeaderMap, HeaderName, HeaderValue}};
-use indicatif::ParallelProgressIterator;
-use std::convert::TryFrom;
+use indicatif::{ParallelProgressIterator, ProgressBar};
 use scraper::{Html, Selector};
 use url::Url;
 use serde::{Deserialize, Serialize};
@@ -166,7 +164,7 @@ fn parse_timestamp(timestamp: &str) -> i64 {
     }
 }
 
-fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_stamp: &str, verbose: bool) {
+fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_stamp: &str, verbose: bool, pbar: bool) {
     let mut log_level = "info";
     if verbose { log_level = "debug" };
 
@@ -177,9 +175,6 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
     let number2 = parse_timestamp(initial_to_stamp);
 
     let final_url_check = AtomicBool::new(false);
-    let final_url_atomic = Arc::new(Mutex::new(String::new()));
-    let final_hash_atomic = Arc::new(Mutex::new(String::new()));
-    let final_number_atomic = Arc::new(Mutex::new(0));
     let mut initial_url_vec_vodsecure: Vec<TwitchURL> = Vec::new();
     let mut initial_url_vec_cloudfront1: Vec<TwitchURL> = Vec::new();
     let mut initial_url_vec_cloudfront2: Vec<TwitchURL> = Vec::new();
@@ -207,35 +202,86 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
     let all_formats_vec: Vec<Vec<TwitchURL>> = vec![initial_url_vec_vodsecure, initial_url_vec_cloudfront1, initial_url_vec_cloudfront2];
     let all_formats_vec: Vec<TwitchURL> = all_formats_vec.into_iter().flatten().collect();
     debug!("Finished making urls.");
-    let vec_len_u64 = u64::try_from(all_formats_vec.len()).unwrap();
-    all_formats_vec.par_iter().progress_count(vec_len_u64).for_each( |url| {
-        if !final_url_check.load(Ordering::SeqCst) {
-            let final_url_atomic = Arc::clone(&final_url_atomic);
-            let final_hash_atomic = Arc::clone(&final_hash_atomic);
-            let final_number_atomic = Arc::clone(&final_number_atomic);
-            let res = HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
-            if res.status() == 200 {
-                final_url_check.store(true, Ordering::SeqCst);
-                let mut final_url = final_url_atomic.lock().unwrap();
-                let mut final_hash = final_hash_atomic.lock().unwrap();
-                let mut final_number = final_number_atomic.lock().unwrap();
-                *final_url = url.full_url.to_string();
-                *final_hash = url.hash.to_string();
-                *final_number = url.timestamp;
-                debug!("Got it! - {:?}", url);
-            } else if res.status() == 403 {
-                debug!("Still going - {:?}", url);
-            } else {
-                error!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status());
-            }
-        }
-    });
+    let pb = ProgressBar::new(all_formats_vec.len() as u64);
+    let cloned_pb = pb.clone();
+    let iter = all_formats_vec.par_iter();
+    let iter_pb = all_formats_vec.par_iter().progress_with(pb);
     
-    let final_url = &*final_url_atomic.lock().unwrap();
-    let final_hash = &*final_hash_atomic.lock().unwrap();
-    let final_number = &*final_number_atomic.lock().unwrap();
+    let final_url: Vec<_>;
+    if pbar {
+        final_url = iter_pb.filter_map( |url| {
+            if !final_url_check.load(Ordering::SeqCst) {
+                let res = HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
+                if res.status() == 200 {
+                    final_url_check.store(true, Ordering::SeqCst);
+                    if verbose {
+                        if pbar {
+                            cloned_pb.println(format!("Got it! - {:?}", url));
+                        } else {
+                            println!("Got it! - {:?}", url);
+                        }
+                    }
+                    Some(url)
+                } else if res.status() == 403 {
+                    if verbose {
+                        if pbar {
+                            cloned_pb.println(format!("Still going - {:?}", url));
+                        } else {
+                            println!("Still going - {:?}", url);
+                        }
+                    }
+                    None
+                } else {
+                    if pbar {
+                        cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status()));
+                    } else {
+                        println!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status());
+                    }
+                    None
+                }
+            } else {
+                None
+            }
+        }).collect();
+    } else {
+        final_url = iter.filter_map( |url| {
+            if !final_url_check.load(Ordering::SeqCst) {
+                let res = HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
+                if res.status() == 200 {
+                    final_url_check.store(true, Ordering::SeqCst);
+                    if verbose {
+                        if pbar {
+                            cloned_pb.println(format!("Got it! - {:?}", url));
+                        } else {
+                            println!("Got it! - {:?}", url);
+                        }
+                    }
+                    Some(url)
+                } else if res.status() == 403 {
+                    if verbose {
+                        if pbar {
+                            cloned_pb.println(format!("Still going - {:?}", url));
+                        } else {
+                            println!("Still going - {:?}", url);
+                        }
+                    }
+                    None
+                } else {
+                    if pbar {
+                        cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status()));
+                    } else {
+                        println!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status());
+                    }
+                    None
+                }
+            } else {
+                None
+            }
+        }).collect();
+    }
+    
     if !final_url.is_empty() {
-        let valid_urls = check_availability(final_hash, username, vod, final_number);
+        let valid_urls = check_availability(&final_url.get(0).unwrap().hash, username, vod, &final_url.get(0).unwrap().timestamp);
         if !valid_urls.is_empty() {
             info!("Got the URL and it was available on Twitch servers. Here are the valid URLs:");
             for url in valid_urls {
@@ -243,7 +289,7 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
             }
         } else {
             info!("Got the URL and it was NOT available on Twitch servers :(");
-            info!("Here's the URL for debug purposes - {}", final_url);
+            info!("Here's the URL for debug purposes - {}", final_url.get(0).unwrap().full_url);
         }
     } else {
         info!("Couldn't find anything :(");
@@ -274,26 +320,60 @@ fn exact(username: &str, vod: i64, initial_stamp: &str, verbose: bool) {
     }
 }
 
-fn clip_bruteforce(vod: String, start: i64, end: i64, verbose: bool) {
+fn clip_bruteforce(vod: String, start: i64, end: i64, verbose: bool, pbar: bool) {
     let mut log_level = "info";
     if verbose { log_level = "debug" };
 
     env_logger::init_from_env(
         Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level));
 
-    let res: Vec<String> = (start..end).into_par_iter().progress_count((end - start) as u64).filter_map( |number| {
-        let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
-        let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
-        if res.status() == 200 {
-            info!("Got a clip! - {}", url);
-            Some(url)
-        } else if res.status() == 403 {
-            None
-        } else {
-            error!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status());
-            None
-        }
-    }).collect();
+    let pb = ProgressBar::new((end - start) as u64);
+    let cloned_pb = pb.clone();
+
+    let iter = (start..end).into_par_iter();
+    let iter_pb = (start..end).into_par_iter().progress_with(pb);
+    let res: Vec<String>;
+
+    if pbar {
+        res = iter_pb.filter_map( |number| {
+            let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
+            let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
+            if res.status() == 200 {
+                if verbose {
+                    cloned_pb.println(format!("Got a clip! - {}", url));
+                }
+                Some(url)
+            } else if res.status() == 403 {
+                if verbose {
+                    cloned_pb.println(format!("Still going! - {}", url));
+                }
+                None
+            } else {
+                cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status()));
+                None
+            }
+        }).collect();
+    } else {
+        res = iter.filter_map( |number| {
+            let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
+            let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
+            if res.status() == 200 {
+                if verbose {
+                    cloned_pb.println(format!("Got a clip! - {}", url));
+                }
+                Some(url)
+            } else if res.status() == 403 {
+                if verbose {
+                    cloned_pb.println(format!("Still going! - {}", url));
+                }
+                None
+            } else {
+                cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status()));
+                None
+            }
+        }).collect();
+    }
+
     if !res.is_empty() {
         info!("Got some clips! Here are the URLs:");
         for line in res {
@@ -355,7 +435,7 @@ fn interface() {
             stdin().read_line(&mut initial_to_stamp).expect("Failed to read line.");
             trim_newline(&mut initial_to_stamp);
 
-            bruteforcer(username.as_str(), vod.parse::<i64>().unwrap(), initial_from_stamp.as_str(), initial_to_stamp.as_str(), false);
+            bruteforcer(username.as_str(), vod.parse::<i64>().unwrap(), initial_from_stamp.as_str(), initial_to_stamp.as_str(), false, true);
             dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
         }
         "3" => {
@@ -402,7 +482,7 @@ fn interface() {
             let start = start.parse::<i64>().unwrap();
             let end = end.parse::<i64>().unwrap();
 
-            clip_bruteforce(vod, start, end, false);
+            clip_bruteforce(vod, start, end, false, true);
             dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
         }
         _ => {}
@@ -426,11 +506,16 @@ fn main() {
                 let initial_to_stamp = matches.value_of("to").unwrap();
 
                 let mut verbose = false;
-                if matches.is_present("v") {
+                if matches.is_present("verbose") {
                     verbose = true;
                 }
 
-                bruteforcer(username, vod, initial_from_stamp, initial_to_stamp, verbose);
+                let mut pbar = false;
+                if matches.is_present("progressbar") {
+                    pbar = true;
+                }
+
+                bruteforcer(username, vod, initial_from_stamp, initial_to_stamp, verbose, pbar);
             }
         },
         Some("exact") => {
@@ -440,7 +525,7 @@ fn main() {
                 let initial_stamp = matches.value_of("stamp").unwrap();
 
                 let mut verbose = false;
-                if matches.is_present("v") {
+                if matches.is_present("verbose") {
                     verbose = true;
                 }
 
@@ -452,7 +537,7 @@ fn main() {
                 let url = matches.value_of("url").unwrap();
 
                 let mut verbose = false;
-                if matches.is_present("v") {
+                if matches.is_present("verbose") {
                     verbose = true;
                 }
 
@@ -466,7 +551,7 @@ fn main() {
                 let slug = matches.value_of("slug").unwrap();
 
                 let mut verbose = false;
-                if matches.is_present("v") {
+                if matches.is_present("verbose") {
                     verbose = true;
                 }
 
@@ -484,11 +569,16 @@ fn main() {
                 let end = matches.value_of("end").unwrap().parse::<i64>().unwrap();
 
                 let mut verbose = false;
-                if matches.is_present("v") {
+                if matches.is_present("verbose") {
                     verbose = true;
                 }
 
-                clip_bruteforce(vod.to_string(), start, end, verbose);
+                let mut pbar = false;
+                if matches.is_present("progressbar") {
+                    pbar = true;
+                }
+
+                clip_bruteforce(vod.to_string(), start, end, verbose, pbar);
             }
         },
         _ => interface()
