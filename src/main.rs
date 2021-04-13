@@ -118,7 +118,7 @@ fn derive_date_from_url(url: &str) -> (String, String, String) {
 
     let body = resp.text().unwrap();
     let fragment = Html::parse_document(&body);
-    let selector = Selector::parse(".stats-value.to-dowdatetime").unwrap();
+    let selector = Selector::parse(".stream-timestamp-dt.to-dowdatetime").unwrap();
 
     let date = fragment.select(&selector).nth(0).unwrap().text().collect::<String>();
     (username.to_string(), broadcast_id.to_string(), date)
