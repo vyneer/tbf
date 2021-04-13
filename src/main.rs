@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use chrono::prelude::*;
 use std::io::stdin;
 use regex::Regex;
-use reqwest::{blocking, Client, header::{HeaderMap, HeaderName, HeaderValue}};
+use reqwest::{blocking, header::{HeaderMap, HeaderName, HeaderValue}};
 use indicatif::ParallelProgressIterator;
 use std::convert::TryFrom;
 use scraper::{Html, Selector};
@@ -17,6 +17,7 @@ use url::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str::FromStr;
+use lazy_static::lazy_static;
 
 #[derive(Debug)]
 struct TwitchURL {
@@ -60,6 +61,11 @@ pub struct Query {
     variables: Vars,
 }
 
+lazy_static! {
+    // HTTP client to share
+    static ref HTTP_CLIENT: reqwest::blocking::Client = reqwest::blocking::Client::new();
+}
+
 
 fn trim_newline(s: &mut String) {
     if s.ends_with('\n') {
@@ -85,7 +91,6 @@ async fn find_bid_from_clip(slug: String) -> (String, i64) {
       header_map.insert(key, val);
     }
 
-    let client = Client::new();
     let query = Query {
         query: "query($slug:ID!){clip(slug: $slug){broadcaster{login}broadcast{id}}}".to_string(),
         variables: Vars {
@@ -93,13 +98,13 @@ async fn find_bid_from_clip(slug: String) -> (String, i64) {
         }
     };
 
-    let request = client
+    let request = HTTP_CLIENT
       .post(endpoint)
       .json(&query)
       .headers(header_map.clone());
 
-    let re = request.send().await.unwrap();
-    let data: Response = re.json().await.unwrap();
+    let re = request.send().unwrap();
+    let data: Response = re.json().unwrap();
     (data.data.clip.broadcaster.login, data.data.clip.broadcast.id.parse::<i64>().unwrap())
 }
 
@@ -179,7 +184,6 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
     let mut initial_url_vec_vodsecure: Vec<TwitchURL> = Vec::new();
     let mut initial_url_vec_cloudfront1: Vec<TwitchURL> = Vec::new();
     let mut initial_url_vec_cloudfront2: Vec<TwitchURL> = Vec::new();
-    let client = blocking::Client::new();
     info!("Starting!");
     for number in number1..number2+1 {
         let mut hasher = Sha1::new();
@@ -210,7 +214,7 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
             let final_url_atomic = Arc::clone(&final_url_atomic);
             let final_hash_atomic = Arc::clone(&final_hash_atomic);
             let final_number_atomic = Arc::clone(&final_number_atomic);
-            let res = client.get(&url.full_url.clone()).send().expect("Error");
+            let res = HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
             if res.status() == 200 {
                 final_url_check.store(true, Ordering::SeqCst);
                 let mut final_url = final_url_atomic.lock().unwrap();
@@ -271,6 +275,36 @@ fn exact(username: &str, vod: i64, initial_stamp: &str, verbose: bool) {
     }
 }
 
+fn clip_bruteforce(vod: String, start: i64, end: i64, verbose: bool) {
+    let mut log_level = "info";
+    if verbose { log_level = "debug" };
+
+    env_logger::init_from_env(
+        Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level));
+
+    let res: Vec<String> = (start..end).into_par_iter().progress_count((end - start) as u64).filter_map( |number| {
+        let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
+        let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
+        if res.status() == 200 {
+            info!("Got a clip! - {}", url);
+            Some(url)
+        } else if res.status() == 403 {
+            None
+        } else {
+            error!("You might be getting throttled (or your connection is dead)! Status code: {}", res.status());
+            None
+        }
+    }).collect();
+    if !res.is_empty() {
+        info!("Got some clips! Here are the URLs:");
+        for line in res {
+            info!("{}", line);
+        }
+    } else {
+        info!("Couldn't find anything :(");
+    }
+}
+
 fn interface() {
     let mut mode = String::new();
 
@@ -279,6 +313,7 @@ fn interface() {
     println!("[2] Bruteforce mode - Goes over a range of timestamps, looking for a usable/working m3u8 URL");
     println!("[3] TwitchTracker mode - The same as the Exact mode, but gets all the info from a TwitchTracker URL");
     println!("[4] Clip mode - Gets the m3u8 from a clip with TwitchTracker's help");
+    println!("[5] Clip bruteforce mode - Goes over a range of timestamps, looking for clips in a VOD");
 
     stdin().read_line(&mut mode).expect("Failed to read line.");
     trim_newline(&mut mode);
@@ -348,6 +383,27 @@ fn interface() {
             let (_, _, initial_stamp) = derive_date_from_url(&url);
 
             exact(username.as_str(), vod, initial_stamp.as_str(), false);
+            dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
+        }
+        "5" => {
+            let mut vod = String::new();
+            let mut start = String::new();
+            let mut end = String::new();
+
+            println!("Please enter the VOD/broadcast ID:");
+            stdin().read_line(&mut vod).expect("Failed to read line.");
+            trim_newline(&mut vod);
+            println!("Please enter the starting timestamp (in seconds):");
+            stdin().read_line(&mut start).expect("Failed to read line.");
+            trim_newline(&mut start);
+            println!("Please enter the end timestamp (in seconds):");
+            stdin().read_line(&mut end).expect("Failed to read line.");
+            trim_newline(&mut end);
+
+            let start = start.parse::<i64>().unwrap();
+            let end = end.parse::<i64>().unwrap();
+
+            clip_bruteforce(vod, start, end, false);
             dont_disappear::any_key_to_continue::custom_msg("Press any key to close...");
         }
         _ => {}
@@ -420,6 +476,20 @@ fn main() {
                 let (_, _, initial_stamp) = derive_date_from_url(&url);
 
                 exact(&username, vod, &initial_stamp, verbose);
+            }
+        },
+        Some("clipforce") => {
+            if let Some(matches) = matches.subcommand_matches("clipforce") {
+                let vod = matches.value_of("id").unwrap();
+                let start = matches.value_of("start").unwrap().parse::<i64>().unwrap();
+                let end = matches.value_of("end").unwrap().parse::<i64>().unwrap();
+
+                let mut verbose = false;
+                if matches.is_present("v") {
+                    verbose = true;
+                }
+
+                clip_bruteforce(vod.to_string(), start, end, verbose);
             }
         },
         _ => interface()

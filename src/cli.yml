@@ -67,3 +67,24 @@ subcommands:
                 required: true
                 takes_value: true
                 help: Twitch clip slug
+    - clipforce:
+        about: Goes over a range of timestamps, looking for clips in a VOD
+        args:
+            - verbose:
+                short: v
+                help: Shows more info
+            - id:
+                required: true
+                takes_value: true
+                help: VOD/broadcast ID (integer)
+                index: 1
+            - start:
+                required: true
+                takes_value: true
+                help: First timestamp (integer)
+                index: 2
+            - end:
+                required: true
+                takes_value: true
+                help: Last timestamp (integer)
+                index: 3
