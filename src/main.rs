@@ -131,12 +131,26 @@ fn check_availability(hash: &String, username: &str, broadcast_id: i64, timestam
     let mut valid_urls: Vec<String> = Vec::new();
     urls.push((format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     urls.push((format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://vod-metro.twitch.tv/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://vod-metro.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://vod-metro.twitch.tv/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://vod-metro.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://vod-pop-secure.twitch.tv/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://vod-pop-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://vod-pop-secure.twitch.tv/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://vod-pop-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     urls.push((format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     urls.push((format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
-    urls.push((format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
-    urls.push((format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     urls.push((format!("https://dqrpb9wgowsf5.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://dqrpb9wgowsf5.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     urls.push((format!("https://dqrpb9wgowsf5.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://dqrpb9wgowsf5.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://ds0h3roq6wcgc.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://ds0h3roq6wcgc.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://ds0h3roq6wcgc.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://ds0h3roq6wcgc.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d2aba1wr3818hz.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d2aba1wr3818hz.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d2aba1wr3818hz.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d2aba1wr3818hz.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d3c27h4odz752x.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d3c27h4odz752x.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d3c27h4odz752x.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d3c27h4odz752x.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://dgeft87wbj63p.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://dgeft87wbj63p.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://dgeft87wbj63p.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://dgeft87wbj63p.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d1m7jfoe9zdc1j.cloudfront.net/{}_{}_{}_{}/chunked/1.ts", hash, username, broadcast_id, timestamp), format!("https://d1m7jfoe9zdc1j.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
+    urls.push((format!("https://d1m7jfoe9zdc1j.cloudfront.net/{}_{}_{}_{}/chunked/1-muted.ts", hash, username, broadcast_id, timestamp), format!("https://d1m7jfoe9zdc1j.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", hash, username, broadcast_id, timestamp)));
     for url in urls {
         if blocking::get(url.0.as_str()).unwrap().status() == 200 {
             valid_urls.push(url.1);
@@ -188,13 +202,53 @@ fn bruteforcer(username: &str, vod: i64, initial_from_stamp: &str, initial_to_st
             hash: hex[0..20].to_string(),
             timestamp: number
         });
+        initial_url_vec_vodsecure.push(TwitchURL {
+            full_url: format!("https://vod-metro.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_vodsecure.push(TwitchURL {
+            full_url: format!("https://vod-pop-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
         initial_url_vec_cloudfront1.push(TwitchURL {
             full_url: format!("https://d2e2de1etea730.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
             hash: hex[0..20].to_string(),
             timestamp: number
         });
         initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://dqrpb9wgowsf5.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://ds0h3roq6wcgc.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
             full_url: format!("https://d2nvs31859zcd8.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://d2aba1wr3818hz.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://d3c27h4odz752x.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://dgeft87wbj63p.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
+            hash: hex[0..20].to_string(),
+            timestamp: number
+        });
+        initial_url_vec_cloudfront2.push(TwitchURL {
+            full_url: format!("https://d1m7jfoe9zdc1j.cloudfront.net/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20], username, vod, number),
             hash: hex[0..20].to_string(),
             timestamp: number
         });
@@ -336,7 +390,7 @@ fn clip_bruteforce(vod: String, start: i64, end: i64, verbose: bool, pbar: bool)
 
     if pbar {
         res = iter_pb.filter_map( |number| {
-            let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
+            let url = format!("https://clips-media-assets2.twitch.tv/AT-cm%7C{}-offset-{}-360.mp4", vod, number);
             let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
             if res.status() == 200 {
                 if verbose {
@@ -355,7 +409,7 @@ fn clip_bruteforce(vod: String, start: i64, end: i64, verbose: bool, pbar: bool)
         }).collect();
     } else {
         res = iter.filter_map( |number| {
-            let url = format!("https://clips-media-assets2.twitch.tv/{}-offset-{}.mp4", vod, number);
+            let url = format!("https://clips-media-assets2.twitch.tv/AT-cm%7C{}-offset-{}-360.mp4", vod, number);
             let res = HTTP_CLIENT.get(url.as_str()).send().unwrap();
             if res.status() == 200 {
                 if verbose {
