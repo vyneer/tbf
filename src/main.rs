@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use chrono::prelude::*;
 use std::io::stdin;
 use regex::Regex;
-use reqwest::{blocking, header::{HeaderMap, HeaderName, HeaderValue}};
+use reqwest::{blocking, header::{HeaderMap, HeaderName, HeaderValue, USER_AGENT}};
 use indicatif::{ParallelProgressIterator, ProgressBar};
 use scraper::{Html, Selector};
 use url::Url;
@@ -112,7 +112,10 @@ fn derive_date_from_url(url: &str) -> (String, String, String) {
     let username = segments[0];
     let broadcast_id = segments[2];
 
-    let resp = blocking::get(url).unwrap();
+    let resp = HTTP_CLIENT.get(url)
+                        .header(USER_AGENT, "curl/7.54.0")
+                        .send()
+                        .unwrap();
     match resp.status().is_success() {
         true => {},
         false => panic!("The URL provided is unavailable, please check your internet connection"),
