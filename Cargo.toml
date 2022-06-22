@@ -1,9 +1,9 @@
 [package]
 name = "tbf"
 description = "Finds VOD playlists on Twitch."
-version = "0.5.0"
+version = "0.6.0"
 authors = ["vyneer <vyn33r@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 log = "0.4"
@@ -11,17 +11,19 @@ clap = { version = "3", features = ["derive", "cargo"] }
 env_logger = "0.9"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 rayon = "1.5"
-rust-crypto = "0.2.36"
-chrono = { version = "0.4", features = ["unstable-locales"] }
+sha1 = "0.10.1"
+time = { version = "0.3", features = ["parsing", "macros"] }
 regex = "1"
 indicatif = {version = "*", features = ["rayon"]}
-dont_disappear = "3.0"
+crossterm = "0.23"
 scraper = "0.13.0"
 url = "2.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.8"
 lazy_static = "1.4.0"
 colored = "2"
+toml = "0.5"
 
 [profile.release]
 lto = true
