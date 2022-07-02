@@ -99,4 +99,22 @@ pub enum Commands {
         /// Last timestamp (integer)
         end: i64,
     },
+
+    /// Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one
+    Fix {
+        /// Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported)
+        url: String,
+
+        /// Set the output path (default is current folder)
+        #[clap(short, long)]
+        output: Option<String>,
+
+        /// Use the old (slow, but more reliable) method of checking for segments
+        #[clap(short, long)]
+        slow: bool,
+
+        /// Enable a progress bar (the progress bar slightly slows down the processing)
+        #[clap(short, long)]
+        progressbar: bool,
+    },
 }

@@ -7,7 +7,7 @@ use rayon::prelude::*;
 
 use crate::config::Flags;
 use crate::util::compile_cdn_list;
-use models::AvailabilityCheck;
+use models::{AvailabilityCheck, ReturnURL};
 
 pub fn check_availability(
     hash: &String,
@@ -15,9 +15,9 @@ pub fn check_availability(
     broadcast_id: i64,
     timestamp: &i64,
     flags: Flags,
-) -> Vec<String> {
+) -> Vec<ReturnURL> {
     let mut urls: Vec<AvailabilityCheck> = Vec::new();
-    let valid_urls: Vec<String>;
+    let valid_urls: Vec<ReturnURL>;
     let cdn_urls_compiled = compile_cdn_list(flags.cdnfile);
     for cdn in cdn_urls_compiled {
         urls.push(AvailabilityCheck {
@@ -56,20 +56,26 @@ pub fn check_availability(
         false => {
             valid_urls = urls_iter
                 .filter_map(|url| {
-                    if crate::HTTP_CLIENT
+                    let unmuted = crate::HTTP_CLIENT
                         .get(url.fragment.as_str())
                         .send()
                         .unwrap()
-                        .status()
-                        == 200
-                        || crate::HTTP_CLIENT
-                            .get(url.fragment_muted.as_str())
-                            .send()
-                            .unwrap()
-                            .status()
-                            == 200
-                    {
-                        Some(url.playlist.clone())
+                        .status();
+                    let muted = crate::HTTP_CLIENT
+                        .get(url.fragment_muted.as_str())
+                        .send()
+                        .unwrap()
+                        .status();
+                    if unmuted == 200 {
+                        Some(ReturnURL {
+                            playlist: url.playlist.clone(),
+                            muted: false,
+                        })
+                    } else if muted == 200 {
+                        Some(ReturnURL {
+                            playlist: url.playlist.clone(),
+                            muted: true,
+                        })
                     } else {
                         None
                     }
@@ -79,20 +85,26 @@ pub fn check_availability(
         true => {
             valid_urls = urls_iter_pb
                 .filter_map(|url| {
-                    if crate::HTTP_CLIENT
+                    let unmuted = crate::HTTP_CLIENT
                         .get(url.fragment.as_str())
                         .send()
                         .unwrap()
-                        .status()
-                        == 200
-                        || crate::HTTP_CLIENT
-                            .get(url.fragment_muted.as_str())
-                            .send()
-                            .unwrap()
-                            .status()
-                            == 200
-                    {
-                        Some(url.playlist.clone())
+                        .status();
+                    let muted = crate::HTTP_CLIENT
+                        .get(url.fragment_muted.as_str())
+                        .send()
+                        .unwrap()
+                        .status();
+                    if unmuted == 200 {
+                        Some(ReturnURL {
+                            playlist: url.playlist.clone(),
+                            muted: false,
+                        })
+                    } else if muted == 200 {
+                        Some(ReturnURL {
+                            playlist: url.playlist.clone(),
+                            muted: true,
+                        })
                     } else {
                         None
                     }

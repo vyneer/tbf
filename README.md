@@ -57,6 +57,24 @@ Get the m3u8 from a TwitchTracker URL.
 
 Get the m3u8 from a clip using TwitchTracker.
 
+### fix
+
+```tbf fix [FLAGS] <url>```
+
+```tbf clip https://vod-secure.twitch.tv/c03c3d945ff2b23bcbc3_pezz_40932307915_1656699046/chunked/index-dvr.m3u8```
+
+Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one.
+
+#### Flags
+
+##### -o, --output
+
+Set the output path (default is current folder).
+
+##### -s, --slow
+
+Use the old (slow, but more reliable) method of checking for segments.
+
 ## Flags
 
 ### -c, --cdnfile 

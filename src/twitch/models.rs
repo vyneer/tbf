@@ -45,6 +45,12 @@ pub struct AvailabilityCheck {
     pub playlist: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct ReturnURL {
+    pub playlist: String,
+    pub muted: bool,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct Response {
     pub data: Data,

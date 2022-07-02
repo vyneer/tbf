@@ -15,7 +15,7 @@ use std::{
 use config::{Cli, Commands, Flags};
 use twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
-    vods::{bruteforcer, exact},
+    vods::{bruteforcer, exact, fix},
 };
 use util::{any_key_to_continue, derive_date_from_url, trim_newline};
 
@@ -34,6 +34,9 @@ fn interface(matches: Cli) {
     println!("[4] Clip mode - Get the m3u8 from a clip using TwitchTracker");
     println!(
         "[5] Clip bruteforce mode - Go over a range of timestamps, looking for clips in a VOD"
+    );
+    println!(
+        "[6] Fix playlist - Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one"
     );
 
     stdin().read_line(&mut mode).expect("Failed to read line.");
@@ -59,17 +62,36 @@ fn interface(matches: Cli) {
                 .expect("Failed to read line.");
             trim_newline(&mut initial_stamp);
 
-            exact(
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            let vaild_urls = exact(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_stamp.as_str(),
-                Flags {
-                    verbose: false,
-                    simple: false,
-                    pbar: true,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+                fl.clone(),
+            )
+            .unwrap();
+            if !vaild_urls.is_empty() {
+                if vaild_urls[0].muted {
+                    let mut response = String::new();
+
+                    println!("Do you want to download the fixed playlist? (Y/n)");
+                    stdin()
+                        .read_line(&mut response)
+                        .expect("Failed to read line.");
+                    trim_newline(&mut response);
+
+                    match response.to_lowercase().as_str() {
+                        "y" | "" => fix(vaild_urls[0].playlist.as_str(), None, false, fl),
+                        _ => {}
+                    }
+                }
+            }
             any_key_to_continue("Press any key to close...");
         }
         "2" => {
@@ -97,18 +119,37 @@ fn interface(matches: Cli) {
                 .expect("Failed to read line.");
             trim_newline(&mut initial_to_stamp);
 
-            bruteforcer(
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            let valid_urls = bruteforcer(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_from_stamp.as_str(),
                 initial_to_stamp.as_str(),
-                Flags {
-                    verbose: false,
-                    simple: false,
-                    pbar: true,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+                fl.clone(),
+            )
+            .unwrap();
+            if !valid_urls.is_empty() {
+                if valid_urls[0].muted {
+                    let mut response = String::new();
+
+                    println!("Do you want to download the fixed playlist? (Y/n)");
+                    stdin()
+                        .read_line(&mut response)
+                        .expect("Failed to read line.");
+                    trim_newline(&mut response);
+
+                    match response.to_lowercase().as_str() {
+                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        _ => {}
+                    }
+                }
+            }
             any_key_to_continue("Press any key to close...");
         }
         "3" => {
@@ -120,17 +161,36 @@ fn interface(matches: Cli) {
 
             let (username, vod, initial_stamp) = derive_date_from_url(&url);
 
-            exact(
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            let valid_urls = exact(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_stamp.as_str(),
-                Flags {
-                    verbose: false,
-                    simple: false,
-                    pbar: true,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+                fl.clone(),
+            )
+            .unwrap();
+            if !valid_urls.is_empty() {
+                if valid_urls[0].muted {
+                    let mut response = String::new();
+
+                    println!("Do you want to download the fixed playlist? (Y/n)");
+                    stdin()
+                        .read_line(&mut response)
+                        .expect("Failed to read line.");
+                    trim_newline(&mut response);
+
+                    match response.to_lowercase().as_str() {
+                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        _ => {}
+                    }
+                }
+            }
             any_key_to_continue("Press any key to close...");
         }
         "4" => {
@@ -144,17 +204,31 @@ fn interface(matches: Cli) {
             let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
             let (_, _, initial_stamp) = derive_date_from_url(&url);
 
-            exact(
-                username.as_str(),
-                vod,
-                initial_stamp.as_str(),
-                Flags {
-                    verbose: false,
-                    simple: false,
-                    pbar: false,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            let valid_urls =
+                exact(username.as_str(), vod, initial_stamp.as_str(), fl.clone()).unwrap();
+            if !valid_urls.is_empty() {
+                if valid_urls[0].muted {
+                    let mut response = String::new();
+
+                    println!("Do you want to download the fixed playlist? (Y/n)");
+                    stdin()
+                        .read_line(&mut response)
+                        .expect("Failed to read line.");
+                    trim_newline(&mut response);
+
+                    match response.to_lowercase().as_str() {
+                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        _ => {}
+                    }
+                }
+            }
             any_key_to_continue("Press any key to close...");
         }
         "5" => {
@@ -187,6 +261,23 @@ fn interface(matches: Cli) {
                     cdnfile: matches.cdnfile,
                 },
             );
+            any_key_to_continue("Press any key to close...");
+        }
+        "6" => {
+            let mut url = String::new();
+
+            println!("Please enter Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported):");
+            stdin().read_line(&mut url).expect("Failed to read line.");
+            trim_newline(&mut url);
+
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            fix(url.as_str(), None, false, fl);
             any_key_to_continue("Press any key to close...");
         }
         _ => {}
@@ -319,6 +410,22 @@ fn main() {
                 },
             );
         }
+        Some(Commands::Fix {
+            url,
+            output,
+            slow,
+            progressbar,
+        }) => fix(
+            url.as_str(),
+            output,
+            slow,
+            Flags {
+                verbose: matches.verbose,
+                simple: matches.simple,
+                pbar: progressbar,
+                cdnfile: matches.cdnfile,
+            },
+        ),
         _ => interface(matches),
     }
 }
