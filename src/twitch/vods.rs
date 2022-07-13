@@ -61,23 +61,31 @@ pub fn bruteforcer(
     if flags.pbar {
         final_url = iter_pb.filter_map( |url| {
             if !final_url_check.load(Ordering::SeqCst) {
-                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
-                match res.status() {
-                    StatusCode::OK => {
-                        final_url_check.store(true, Ordering::SeqCst);
-                        if flags.verbose {
-                            cloned_pb.println(format!("Got it! - {:?}", url));
+                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
+                match res {
+                    Ok(res) => {
+                        match res.status() {
+                            StatusCode::OK => {
+                                final_url_check.store(true, Ordering::SeqCst);
+                                if flags.verbose {
+                                    cloned_pb.println(format!("Got it! - {:?}", url));
+                                }
+                                Some(url)
+                            }
+                            StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
+                                if flags.verbose {
+                                    cloned_pb.println(format!("Still going - {:?}", url));
+                                }
+                                None
+                            }
+                            _ => {
+                                cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
+                                None
+                            }
                         }
-                        Some(url)
-                    }
-                    StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
-                        if flags.verbose {
-                            cloned_pb.println(format!("Still going - {:?}", url));
-                        }
-                        None
-                    }
-                    _ => {
-                        cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
+                    },
+                    Err(e) => {
+                        cloned_pb.println(format!("Reqwest error: {}", e));
                         None
                     }
                 }
@@ -88,19 +96,27 @@ pub fn bruteforcer(
     } else {
         final_url = iter.filter_map( |url| {
             if !final_url_check.load(Ordering::SeqCst) {
-                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send().expect("Error");
-                match res.status() {
-                    StatusCode::OK => {
-                        final_url_check.store(true, Ordering::SeqCst);
-                        debug!("Got it! - {:?}", url);
-                        Some(url)
-                    }
-                    StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
-                        debug!("Still going - {:?}", url);
-                        None
-                    }
-                    _ => {
-                        info(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()), flags.simple);
+                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
+                match res {
+                    Ok(res) => {
+                        match res.status() {
+                            StatusCode::OK => {
+                                final_url_check.store(true, Ordering::SeqCst);
+                                debug!("Got it! - {:?}", url);
+                                Some(url)
+                            }
+                            StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
+                                debug!("Still going - {:?}", url);
+                                None
+                            }
+                            _ => {
+                                info(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()), flags.simple);
+                                None
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        info(format!("Reqwest error: {}", e), flags.simple);
                         None
                     }
                 }
