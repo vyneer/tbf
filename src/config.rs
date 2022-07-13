@@ -80,8 +80,8 @@ pub enum Commands {
         #[clap(short, long)]
         progressbar: bool,
 
-        /// Clip's slug
-        slug: String,
+        /// Clip's URL (twitch.tv/%username%/clip/%slug% and clips.twitch.tv/%slug% are both supported) or slug ("GentleAthleticWombatHoneyBadger-ohJAsKzGinIgFUx2" for example)
+        clip: String,
     },
 
     /// Go over a range of timestamps, looking for clips in a VOD

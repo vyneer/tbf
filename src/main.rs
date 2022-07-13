@@ -69,15 +69,17 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            let vaild_urls = exact(
+            let valid_urls = match exact(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_stamp.as_str(),
                 fl.clone(),
-            )
-            .unwrap();
-            if !vaild_urls.is_empty() {
-                if vaild_urls[0].muted {
+            ) {
+                Some(u) => u,
+                None => Vec::new(),
+            };
+            if !valid_urls.is_empty() {
+                if valid_urls[0].muted {
                     let mut response = String::new();
 
                     println!("Do you want to download the fixed playlist? (Y/n)");
@@ -87,7 +89,7 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => fix(vaild_urls[0].playlist.as_str(), None, false, fl),
+                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
                         _ => {}
                     }
                 }
@@ -126,14 +128,16 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            let valid_urls = bruteforcer(
+            let valid_urls = match bruteforcer(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_from_stamp.as_str(),
                 initial_to_stamp.as_str(),
                 fl.clone(),
-            )
-            .unwrap();
+            ) {
+                Some(u) => u,
+                None => Vec::new(),
+            };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
                     let mut response = String::new();
@@ -168,13 +172,15 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            let valid_urls = exact(
+            let valid_urls = match exact(
                 username.as_str(),
                 vod.parse::<i64>().unwrap(),
                 initial_stamp.as_str(),
                 fl.clone(),
-            )
-            .unwrap();
+            ) {
+                Some(u) => u,
+                None => Vec::new(),
+            };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
                     let mut response = String::new();
@@ -194,15 +200,11 @@ fn interface(matches: Cli) {
             any_key_to_continue("Press any key to close...");
         }
         "4" => {
-            let mut slug = String::new();
+            let mut clip = String::new();
 
-            println!("Please enter the clip's slug (that's the EncouragingTallDragonSpicyBoy or w.e. part):");
-            stdin().read_line(&mut slug).expect("Failed to read line.");
-            trim_newline(&mut slug);
-
-            let (username, vod) = find_bid_from_clip(slug);
-            let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-            let (_, _, initial_stamp) = derive_date_from_url(&url);
+            println!("Please enter the clip's URL (twitch.tv/%username%/clip/%slug% and clips.twitch.tv/%slug% are both supported) or the slug (\"GentleAthleticWombatHoneyBadger-ohJAsKzGinIgFUx2\" for example):");
+            stdin().read_line(&mut clip).expect("Failed to read line.");
+            trim_newline(&mut clip);
 
             let fl = Flags {
                 verbose: false,
@@ -211,24 +213,36 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            let valid_urls =
-                exact(username.as_str(), vod, initial_stamp.as_str(), fl.clone()).unwrap();
-            if !valid_urls.is_empty() {
-                if valid_urls[0].muted {
-                    let mut response = String::new();
+            match find_bid_from_clip(clip, fl.clone()) {
+                Some((username, vod)) => {
+                    let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
+                    let (_, _, initial_stamp) = derive_date_from_url(&url);
 
-                    println!("Do you want to download the fixed playlist? (Y/n)");
-                    stdin()
-                        .read_line(&mut response)
-                        .expect("Failed to read line.");
-                    trim_newline(&mut response);
+                    let valid_urls =
+                        match exact(username.as_str(), vod, initial_stamp.as_str(), fl.clone()) {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        };
+                    if !valid_urls.is_empty() {
+                        if valid_urls[0].muted {
+                            let mut response = String::new();
 
-                    match response.to_lowercase().as_str() {
-                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
-                        _ => {}
+                            println!("Do you want to download the fixed playlist? (Y/n)");
+                            stdin()
+                                .read_line(&mut response)
+                                .expect("Failed to read line.");
+                            trim_newline(&mut response);
+
+                            match response.to_lowercase().as_str() {
+                                "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                                _ => {}
+                            }
+                        }
                     }
                 }
-            }
+                None => {}
+            };
+
             any_key_to_continue("Press any key to close...");
         }
         "5" => {
@@ -374,23 +388,23 @@ fn main() {
                 },
             );
         }
-        Some(Commands::Clip { progressbar, slug }) => {
-            let slug = slug.as_str();
-            let (username, vod) = find_bid_from_clip(slug.to_string());
-            let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-            let (_, _, initial_stamp) = derive_date_from_url(&url);
+        Some(Commands::Clip { progressbar, clip }) => {
+            let fl = Flags {
+                verbose: matches.verbose,
+                simple: matches.simple,
+                pbar: progressbar,
+                cdnfile: matches.cdnfile,
+            };
 
-            exact(
-                &username,
-                vod,
-                &initial_stamp,
-                Flags {
-                    verbose: matches.verbose,
-                    simple: matches.simple,
-                    pbar: progressbar,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+            match find_bid_from_clip(clip, fl.clone()) {
+                Some((username, vod)) => {
+                    let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
+                    let (_, _, initial_stamp) = derive_date_from_url(&url);
+
+                    exact(&username, vod, &initial_stamp, fl);
+                }
+                None => {}
+            }
         }
         Some(Commands::Clipforce {
             progressbar,

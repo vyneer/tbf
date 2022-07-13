@@ -4,12 +4,54 @@ use crate::util::info;
 
 use colored::*;
 use indicatif::{ParallelProgressIterator, ProgressBar};
-use log::info;
+use log::{error, info};
 use rayon::prelude::*;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::{collections::HashMap, str::FromStr};
+use url::Url;
 
-pub fn find_bid_from_clip(slug: String) -> (String, i64) {
+fn extract_slug(s: String) -> Option<String> {
+    match Url::parse(s.as_str()) {
+        Ok(resolved_url) => match resolved_url.domain() {
+            Some(domain) => match domain.to_lowercase().as_str() {
+                "twitch.tv" | "www.twitch.tv" => {
+                    let segments = resolved_url
+                        .path_segments()
+                        .map(|c| c.collect::<Vec<_>>())
+                        .unwrap();
+                    if segments[1] == "clip" {
+                        return Some(segments[2].to_string());
+                    } else {
+                        error!("Not a clip URL");
+                        return None;
+                    };
+                }
+                "clips.twitch.tv" => {
+                    let segments = resolved_url
+                        .path_segments()
+                        .map(|c| c.collect::<Vec<_>>())
+                        .unwrap();
+                    return Some(segments[0].to_string());
+                }
+                _ => {
+                    error!("Only twitch.tv URLs are supported");
+                    None
+                }
+            },
+            None => {
+                error!("Only twitch.tv URLs are supported");
+                None
+            }
+        },
+        Err(_) => Some(s),
+    }
+}
+
+pub fn find_bid_from_clip(s: String, flags: Flags) -> Option<(String, i64)> {
+    let slug = match extract_slug(s) {
+        Some(s) => s,
+        None => return None,
+    };
     let endpoint = "https://gql.twitch.tv/gql";
     let mut headers = HashMap::new();
     headers.insert("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko");
@@ -34,11 +76,19 @@ pub fn find_bid_from_clip(slug: String) -> (String, i64) {
         .headers(header_map.clone());
 
     let re = request.send().unwrap();
-    let data: models::Response = re.json().unwrap();
-    (
+    let data: models::Response = match re.json() {
+        Ok(d) => d,
+        Err(e) => {
+            if !flags.simple {
+                error!("Couldn't get the info from the clip: {}", e);
+            }
+            return None;
+        }
+    };
+    Some((
         data.data.clip.broadcaster.login,
         data.data.clip.broadcast.id.parse::<i64>().unwrap(),
-    )
+    ))
 }
 
 pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
