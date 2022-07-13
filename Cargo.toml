@@ -9,7 +9,7 @@ edition = "2021"
 log = "0.4"
 clap = { version = "3", features = ["derive", "cargo"] }
 env_logger = "0.9"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls-webpki-roots"] }
 rayon = "1.5"
 sha1 = "0.10.1"
 time = { version = "0.3", features = ["parsing", "macros"] }
