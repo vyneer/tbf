@@ -51,9 +51,9 @@ Get the m3u8 from a TwitchTracker URL.
 
 ### clip
 
-```tbf clip [FLAGS] <slug>```
+```tbf clip [FLAGS] <clip>```
 
-```tbf clip SmokyHomelyIguanaAllenHuhu```
+```tbf clip SpotlessCrypticStapleAMPTropPunch-H_rVu0mGfGLNMlEx```
 
 Get the m3u8 from a clip using TwitchTracker.
 
