@@ -16,8 +16,22 @@ use time::{
     format_description::well_known::Rfc3339, macros::format_description, PrimitiveDateTime,
 };
 use url::Url;
+use rand::seq::SliceRandom;
 
 use crate::twitch::models::CDN_URLS;
+use super::config::CURL_UA;
+
+pub enum ProcessingType {
+    Exact,
+    Bruteforce,
+}
+
+pub struct URLData {
+    pub username: String,
+    pub broadcast_id: String,
+    pub start_date: String,
+    pub end_date: Option<String>,
+} 
 
 #[derive(Debug, Deserialize)]
 pub struct CDNFile {
@@ -47,21 +61,36 @@ pub fn trim_newline(s: &mut String) {
     }
 }
 
-pub fn derive_date_from_url(url: &str) -> (String, String, String) {
-    if !url.contains("twitchtracker.com") {
-        panic!("Only twitchtracker.com URLs are supported");
+pub fn get_random_useragent() -> String {
+    let resp = crate::HTTP_CLIENT
+        .get("https://jnrbsn.github.io/user-agents/user-agents.json")
+        .send();
+        
+    match resp {
+        Ok(r) => {
+            match r.status().is_success() {
+                true => {
+                    let useragent_vec: Vec<String> = match r.json() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            return CURL_UA.to_string()
+                        }
+                    };
+                    return useragent_vec.choose(&mut rand::thread_rng()).unwrap().to_owned();
+                },
+                false => {}
+            }
+        },
+        Err(_) => {}
     }
-    let resolved_url = Url::parse(url).unwrap();
-    let segments = resolved_url
-        .path_segments()
-        .map(|c| c.collect::<Vec<_>>())
-        .unwrap();
-    let username = segments[0];
-    let broadcast_id = segments[2];
+    
+    return CURL_UA.to_string()
+}
 
+fn process_url(url: &str) -> Html {
     let resp = crate::HTTP_CLIENT
         .get(url)
-        .header(USER_AGENT, "curl/7.54.0")
+        .header(USER_AGENT, get_random_useragent())
         .send()
         .unwrap();
     match resp.status().is_success() {
@@ -74,16 +103,94 @@ pub fn derive_date_from_url(url: &str) -> (String, String, String) {
     }
 
     let body = resp.text().unwrap();
-    let fragment = Html::parse_document(&body);
-    let selector = Selector::parse(".stream-timestamp-dt.to-dowdatetime").unwrap();
+    Html::parse_document(&body)
+}
 
-    let date = fragment
-        .select(&selector)
-        .nth(0)
-        .unwrap()
-        .text()
-        .collect::<String>();
-    (username.to_string(), broadcast_id.to_string(), date)
+pub fn derive_date_from_url(url: &str) -> (ProcessingType, URLData) {
+    match Url::parse(url) {
+        Ok(resolved_url) => match resolved_url.domain() {
+            Some(domain) => match domain.to_lowercase().as_str() {
+                "twitchtracker.com" | "www.twitchtracker.com" => {
+                    let segments = resolved_url
+                        .path_segments()
+                        .map(|c| c.collect::<Vec<_>>())
+                        .unwrap();
+                    if segments.len() == 3 {
+                        if segments[1] == "streams" {
+                            let username = segments[0];
+                            let broadcast_id = segments[2];
+                            let fragment = process_url(url);
+                            let selector = Selector::parse(".stream-timestamp-dt.to-dowdatetime").unwrap();
+    
+                            let date = fragment
+                                .select(&selector)
+                                .nth(0)
+                                .unwrap()
+                                .text()
+                                .collect::<String>();
+    
+                            return (ProcessingType::Exact,
+                            URLData {
+                                username: username.to_string(),
+                                broadcast_id: broadcast_id.to_string(),
+                                start_date: date,
+                                end_date: None,
+                            })
+                        } else {
+                            panic!("Not a valid TwitchTracker VOD URL");
+                        };
+                    } else {
+                        panic!("Not a valid TwitchTracker VOD URL");
+                    };
+                },
+                "streamscharts.com" | "www.streamscharts.com" => {
+                    let segments = resolved_url
+                        .path_segments()
+                        .map(|c| c.collect::<Vec<_>>())
+                        .unwrap();
+                    if segments.len() == 4 {
+                        if segments[0] == "channels" && segments[2] == "streams" {
+                            let username = segments[1];
+                            let broadcast_id = segments[3];
+                            let fragment = process_url(url);
+                            let selector = Selector::parse("time").unwrap();
+    
+                            let date_init = fragment
+                                .select(&selector)
+                                .nth(0)
+                                .unwrap()
+                                .value()
+                                .attr("datetime")
+                                .unwrap()
+                                .to_string();
+
+                            let start_date = parse_timestamp(&date_init) - 30;
+                            let end_date = start_date + 60;
+    
+                            return (ProcessingType::Bruteforce,
+                            URLData {
+                                username: username.to_string(),
+                                broadcast_id: broadcast_id.to_string(),
+                                start_date: start_date.to_string(),
+                                end_date: Some(end_date.to_string()),
+                            })
+                        } else {
+                            panic!("Not a valid StreamsCharts VOD URL");
+                        };
+                    } else {
+                        panic!("Not a valid StreamsCharts VOD URL");
+                    };
+                }
+                _ => {
+                    panic!("Only twitchtracker.com and streamscharts.com URLs are supported");
+                }
+            },
+            None => {
+                panic!("Only twitchtracker.com and streamscharts.com URLs are supported");
+            }
+        },
+        Err(e) => panic!("{}", e),
+    }
 }
 
 pub fn parse_timestamp(timestamp: &str) -> i64 {
@@ -91,6 +198,7 @@ pub fn parse_timestamp(timestamp: &str) -> i64 {
     let re_utc = Regex::new("UTC").unwrap();
     let format_with_utc = format_description!("[year]-[month]-[day] [hour]:[minute]:[second] UTC");
     let format_wo_utc = format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
+    let format_wo_sec = format_description!("[day]-[month]-[year] [hour]:[minute]");
 
     if re_unix.is_match(timestamp) {
         timestamp.parse::<i64>().unwrap()
@@ -104,10 +212,16 @@ pub fn parse_timestamp(timestamp: &str) -> i64 {
             let parsed_rfc = PrimitiveDateTime::parse(timestamp, &Rfc3339);
             match parsed_rfc {
                 Ok(result) => result.assume_utc().unix_timestamp(),
-                Err(_) => PrimitiveDateTime::parse(timestamp, format_wo_utc)
-                    .unwrap()
-                    .assume_utc()
-                    .unix_timestamp(),
+                Err(_) => {
+                    let parsed_wo_utc = PrimitiveDateTime::parse(timestamp, format_wo_utc);
+                    match parsed_wo_utc {
+                        Ok(result) => result.assume_utc().unix_timestamp(),
+                        Err(_) => PrimitiveDateTime::parse(timestamp, format_wo_sec)
+                            .unwrap()
+                            .assume_utc()
+                            .unix_timestamp(),
+                    }
+                }
             }
         }
     }

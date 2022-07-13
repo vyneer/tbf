@@ -1,5 +1,7 @@
 use clap::{Parser, Subcommand};
 
+pub const CURL_UA: &str = "curl/7.54.0";
+
 #[derive(Debug, Clone)]
 pub struct Flags {
     pub verbose: bool,
@@ -64,13 +66,13 @@ pub enum Commands {
         stamp: String,
     },
 
-    /// Get the m3u8 from a TwitchTracker URL
+    /// Get the m3u8 from a TwitchTracker/StreamsCharts URL
     Link {
         /// Enable a progress bar (the progress bar slightly slows down the processing)
         #[clap(short, long)]
         progressbar: bool,
 
-        /// TwitchTracker URL
+        /// TwitchTracker/StreamsCharts URL
         url: String,
     },
 

@@ -17,7 +17,7 @@ use twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
     vods::{bruteforcer, exact, fix},
 };
-use util::{any_key_to_continue, derive_date_from_url, trim_newline};
+use util::{ProcessingType, any_key_to_continue, derive_date_from_url, trim_newline};
 
 lazy_static! {
     // HTTP client to share
@@ -30,7 +30,7 @@ fn interface(matches: Cli) {
     println!("Please select the mode you want:");
     println!("[1] Exact mode - Combine all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL and check whether the VOD is available");
     println!("[2] Bruteforce mode - Go over a range of timestamps, looking for a usable/working m3u8 URL, and check whether the VOD is available");
-    println!("[3] TwitchTracker mode - Get the m3u8 from a TwitchTracker URL");
+    println!("[3] Link mode - Get the m3u8 from a TwitchTracker/StreamsCharts URL");
     println!("[4] Clip mode - Get the m3u8 from a clip using TwitchTracker");
     println!(
         "[5] Clip bruteforce mode - Go over a range of timestamps, looking for clips in a VOD"
@@ -159,11 +159,11 @@ fn interface(matches: Cli) {
         "3" => {
             let mut url = String::new();
 
-            println!("Please enter the TwitchTracker URL:");
+            println!("Please enter the TwitchTracker or StreamsCharts URL:");
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let (username, vod, initial_stamp) = derive_date_from_url(&url);
+            let (proc, data) = derive_date_from_url(&url);
 
             let fl = Flags {
                 verbose: false,
@@ -172,14 +172,30 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            let valid_urls = match exact(
-                username.as_str(),
-                vod.parse::<i64>().unwrap(),
-                initial_stamp.as_str(),
-                fl.clone(),
-            ) {
-                Some(u) => u,
-                None => Vec::new(),
+            let valid_urls = match proc {
+                ProcessingType::Exact => {
+                    match exact(
+                        data.username.as_str(),
+                        data.broadcast_id.parse::<i64>().unwrap(),
+                        data.start_date.as_str(),
+                        fl.clone(),
+                    ) {
+                        Some(u) => u,
+                        None => Vec::new(),
+                    }
+                },
+                ProcessingType::Bruteforce => {
+                    match bruteforcer(
+                        data.username.as_str(),
+                        data.broadcast_id.parse::<i64>().unwrap(),
+                        data.start_date.as_str(),
+                        data.end_date.unwrap().as_str(),
+                        fl.clone(),
+                    ) {
+                        Some(u) => u,
+                        None => Vec::new(),
+                    }
+                }
             };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
@@ -216,10 +232,10 @@ fn interface(matches: Cli) {
             match find_bid_from_clip(clip, fl.clone()) {
                 Some((username, vod)) => {
                     let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                    let (_, _, initial_stamp) = derive_date_from_url(&url);
+                    let (_, data) = derive_date_from_url(&url);
 
                     let valid_urls =
-                        match exact(username.as_str(), vod, initial_stamp.as_str(), fl.clone()) {
+                        match exact(username.as_str(), vod, data.start_date.as_str(), fl.clone()) {
                             Some(u) => u,
                             None => Vec::new(),
                         };
@@ -374,12 +390,12 @@ fn main() {
         }
         Some(Commands::Link { progressbar, url }) => {
             let url = url.as_str();
-            let (username, vod, initial_stamp) = derive_date_from_url(&url);
+            let (_, data) = derive_date_from_url(&url);
 
             exact(
-                &username,
-                vod.parse::<i64>().unwrap(),
-                &initial_stamp,
+                &data.username,
+                data.broadcast_id.parse::<i64>().unwrap(),
+                &data.start_date,
                 Flags {
                     verbose: matches.verbose,
                     simple: matches.simple,
@@ -399,9 +415,9 @@ fn main() {
             match find_bid_from_clip(clip, fl.clone()) {
                 Some((username, vod)) => {
                     let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                    let (_, _, initial_stamp) = derive_date_from_url(&url);
+                    let (_, data) = derive_date_from_url(&url);
 
-                    exact(&username, vod, &initial_stamp, fl);
+                    exact(&username, vod, &data.start_date, fl);
                 }
                 None => {}
             }

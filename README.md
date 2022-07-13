@@ -47,7 +47,7 @@ Go over a range of timestamps, looking for clips in a VOD.
 
 ```tbf link https://twitchtracker.com/destiny/streams/41402441870```
 
-Get the m3u8 from a TwitchTracker URL.
+Get the m3u8 from a TwitchTracker/StreamsCharts URL.
 
 ### clip
 
