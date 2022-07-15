@@ -45,7 +45,7 @@ pub struct AvailabilityCheck {
     pub playlist: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReturnURL {
     pub playlist: String,
     pub muted: bool,

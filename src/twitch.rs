@@ -56,16 +56,14 @@ pub fn check_availability(
         false => {
             valid_urls = urls_iter
                 .filter_map(|url| {
-                    let unmuted = crate::HTTP_CLIENT
-                        .get(url.fragment.as_str())
-                        .send()
-                        .unwrap()
-                        .status();
-                    let muted = crate::HTTP_CLIENT
-                        .get(url.fragment_muted.as_str())
-                        .send()
-                        .unwrap()
-                        .status();
+                    let unmuted = match crate::HTTP_CLIENT.get(url.fragment.as_str()).send() {
+                        Ok(r) => r.status(),
+                        Err(_) => return None,
+                    };
+                    let muted = match crate::HTTP_CLIENT.get(url.fragment_muted.as_str()).send() {
+                        Ok(r) => r.status(),
+                        Err(_) => return None,
+                    };
                     if unmuted == 200 {
                         Some(ReturnURL {
                             playlist: url.playlist.clone(),
@@ -85,16 +83,14 @@ pub fn check_availability(
         true => {
             valid_urls = urls_iter_pb
                 .filter_map(|url| {
-                    let unmuted = crate::HTTP_CLIENT
-                        .get(url.fragment.as_str())
-                        .send()
-                        .unwrap()
-                        .status();
-                    let muted = crate::HTTP_CLIENT
-                        .get(url.fragment_muted.as_str())
-                        .send()
-                        .unwrap()
-                        .status();
+                    let unmuted = match crate::HTTP_CLIENT.get(url.fragment.as_str()).send() {
+                        Ok(r) => r.status(),
+                        Err(_) => return None,
+                    };
+                    let muted = match crate::HTTP_CLIENT.get(url.fragment_muted.as_str()).send() {
+                        Ok(r) => r.status(),
+                        Err(_) => return None,
+                    };
                     if unmuted == 200 {
                         Some(ReturnURL {
                             playlist: url.playlist.clone(),
@@ -114,4 +110,52 @@ pub fn check_availability(
     }
 
     valid_urls
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{config::Flags, twitch::models::ReturnURL};
+
+    use super::check_availability as ca;
+
+    #[test]
+    fn check_availability() {
+        // https://twitchtracker.com/dansgaming/streams/42218705421 - d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217 - 2021-06-05 00:50:17
+        let ca_working: Vec<ReturnURL> = ca(
+            &"d3dcbaf880c9e36ed8c8".to_string(),
+            "dansgaming",
+            42218705421,
+            &1622854217,
+            Flags::default(),
+        );
+
+        let comp_working: Vec<ReturnURL> = vec![ReturnURL {
+            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }, ReturnURL {
+            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }];
+
+        assert_eq!(
+            ca_working, comp_working,
+            "testing valid vod (dansgaming - 2021)"
+        );
+
+        // https://twitchtracker.com/forsen/streams/23722143840 - d45bc961583725d59867_forsen_23722143840_1479745189 - 2016-11-21 16:19:49
+        let ca_not_working: Vec<ReturnURL> = ca(
+            &"d45bc961583725d59867".to_string(),
+            "forsen",
+            23722143840,
+            &1479745189,
+            Flags::default(),
+        );
+
+        let comp_not_working: Vec<ReturnURL> = vec![];
+
+        assert_eq!(
+            ca_not_working, comp_not_working,
+            "testing invalid vod (forsen - 2016)"
+        );
+    }
 }

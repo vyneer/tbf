@@ -1,4 +1,5 @@
 mod config;
+mod error;
 mod twitch;
 mod util;
 
@@ -17,7 +18,7 @@ use twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
     vods::{bruteforcer, exact, fix},
 };
-use util::{ProcessingType, any_key_to_continue, derive_date_from_url, trim_newline};
+use util::{any_key_to_continue, derive_date_from_url, trim_newline, ProcessingType};
 
 lazy_static! {
     // HTTP client to share
@@ -42,7 +43,7 @@ fn interface(matches: Cli) {
     stdin().read_line(&mut mode).expect("Failed to read line.");
     trim_newline(&mut mode);
 
-    match mode.as_str() {
+    (|| match mode.as_str() {
         "1" => {
             let mut username = String::new();
             let mut vod = String::new();
@@ -71,12 +72,24 @@ fn interface(matches: Cli) {
 
             let valid_urls = match exact(
                 username.as_str(),
-                vod.parse::<i64>().unwrap(),
+                match vod.parse::<i64>() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                },
                 initial_stamp.as_str(),
                 fl.clone(),
             ) {
-                Some(u) => u,
-                None => Vec::new(),
+                Ok(u) => match u {
+                    Some(u) => u,
+                    None => Vec::new(),
+                },
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
             };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
@@ -89,12 +102,19 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
                         _ => {}
                     }
                 }
             }
-            any_key_to_continue("Press any key to close...");
+
+            return;
         }
         "2" => {
             let mut username = String::new();
@@ -130,13 +150,25 @@ fn interface(matches: Cli) {
 
             let valid_urls = match bruteforcer(
                 username.as_str(),
-                vod.parse::<i64>().unwrap(),
+                match vod.parse::<i64>() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                },
                 initial_from_stamp.as_str(),
                 initial_to_stamp.as_str(),
                 fl.clone(),
             ) {
-                Some(u) => u,
-                None => Vec::new(),
+                Ok(u) => match u {
+                    Some(u) => u,
+                    None => Vec::new(),
+                },
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
             };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
@@ -149,12 +181,19 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
                         _ => {}
                     }
                 }
             }
-            any_key_to_continue("Press any key to close...");
+
+            return;
         }
         "3" => {
             let mut url = String::new();
@@ -163,7 +202,13 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let (proc, data) = derive_date_from_url(&url);
+            let (proc, data) = match derive_date_from_url(&url) {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
 
             let fl = Flags {
                 verbose: false,
@@ -176,24 +221,55 @@ fn interface(matches: Cli) {
                 ProcessingType::Exact => {
                     match exact(
                         data.username.as_str(),
-                        data.broadcast_id.parse::<i64>().unwrap(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
                         data.start_date.as_str(),
                         fl.clone(),
                     ) {
-                        Some(u) => u,
-                        None => Vec::new(),
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
                     }
-                },
+                }
                 ProcessingType::Bruteforce => {
+                    let end_date = match data.end_date {
+                        Some(d) => d,
+                        None => {
+                            error!("Couldn't get the end date for the bruteforce method");
+                            return;
+                        }
+                    };
                     match bruteforcer(
                         data.username.as_str(),
-                        data.broadcast_id.parse::<i64>().unwrap(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
                         data.start_date.as_str(),
-                        data.end_date.unwrap().as_str(),
+                        end_date.as_str(),
                         fl.clone(),
                     ) {
-                        Some(u) => u,
-                        None => Vec::new(),
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
                     }
                 }
             };
@@ -208,12 +284,19 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
+                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
                         _ => {}
                     }
                 }
             }
-            any_key_to_continue("Press any key to close...");
+
+            return;
         }
         "4" => {
             let mut clip = String::new();
@@ -230,36 +313,67 @@ fn interface(matches: Cli) {
             };
 
             match find_bid_from_clip(clip, fl.clone()) {
-                Some((username, vod)) => {
-                    let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                    let (_, data) = derive_date_from_url(&url);
-
-                    let valid_urls =
-                        match exact(username.as_str(), vod, data.start_date.as_str(), fl.clone()) {
-                            Some(u) => u,
-                            None => Vec::new(),
+                Ok(r) => match r {
+                    Some((username, vod)) => {
+                        let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
+                        let (_, data) = match derive_date_from_url(&url) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
                         };
-                    if !valid_urls.is_empty() {
-                        if valid_urls[0].muted {
-                            let mut response = String::new();
 
-                            println!("Do you want to download the fixed playlist? (Y/n)");
-                            stdin()
-                                .read_line(&mut response)
-                                .expect("Failed to read line.");
-                            trim_newline(&mut response);
+                        let valid_urls = match exact(
+                            username.as_str(),
+                            vod,
+                            data.start_date.as_str(),
+                            fl.clone(),
+                        ) {
+                            Ok(u) => match u {
+                                Some(u) => u,
+                                None => Vec::new(),
+                            },
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        };
+                        if !valid_urls.is_empty() {
+                            if valid_urls[0].muted {
+                                let mut response = String::new();
 
-                            match response.to_lowercase().as_str() {
-                                "y" | "" => fix(valid_urls[0].playlist.as_str(), None, false, fl),
-                                _ => {}
+                                println!("Do you want to download the fixed playlist? (Y/n)");
+                                stdin()
+                                    .read_line(&mut response)
+                                    .expect("Failed to read line.");
+                                trim_newline(&mut response);
+
+                                match response.to_lowercase().as_str() {
+                                    "y" | "" => {
+                                        match fix(valid_urls[0].playlist.as_str(), None, false, fl)
+                                        {
+                                            Ok(_) => {}
+                                            Err(e) => {
+                                                error!("{}", e);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
                     }
+                    None => {}
+                },
+                Err(e) => {
+                    error!("{}", e);
+                    return;
                 }
-                None => {}
             };
 
-            any_key_to_continue("Press any key to close...");
+            return;
         }
         "5" => {
             let mut vod = String::new();
@@ -276,9 +390,27 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut end).expect("Failed to read line.");
             trim_newline(&mut end);
 
-            let vod = vod.parse::<i64>().unwrap();
-            let start = start.parse::<i64>().unwrap();
-            let end = end.parse::<i64>().unwrap();
+            let vod = match vod.parse::<i64>() {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+            let start = match start.parse::<i64>() {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+            let end = match end.parse::<i64>() {
+                Ok(e) => e,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
 
             clip_bruteforce(
                 vod,
@@ -291,7 +423,8 @@ fn interface(matches: Cli) {
                     cdnfile: matches.cdnfile,
                 },
             );
-            any_key_to_continue("Press any key to close...");
+
+            return;
         }
         "6" => {
             let mut url = String::new();
@@ -307,11 +440,20 @@ fn interface(matches: Cli) {
                 cdnfile: matches.cdnfile,
             };
 
-            fix(url.as_str(), None, false, fl);
-            any_key_to_continue("Press any key to close...");
+            match fix(url.as_str(), None, false, fl) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+
+            return;
         }
-        _ => {}
-    }
+        _ => return,
+    })();
+
+    any_key_to_continue("Press any key to close...");
 }
 
 fn main() {
@@ -328,9 +470,10 @@ fn main() {
         log_level = "debug";
     }
 
-    env_logger::Builder::from_env(
-        Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, log_level),
-    )
+    env_logger::Builder::from_env(Env::default().filter_or(
+        env_logger::DEFAULT_FILTER_ENV,
+        format!("{},html5ever=info,selectors=info", log_level),
+    ))
     .format_timestamp_millis()
     .init();
 
@@ -365,7 +508,13 @@ fn main() {
                 cdnfile: matches.cdnfile,
             };
 
-            bruteforcer(username, id, initial_from_stamp, initial_to_stamp, flags);
+            match bruteforcer(username, id, initial_from_stamp, initial_to_stamp, flags) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
         }
         Some(Commands::Exact {
             progressbar,
@@ -376,7 +525,7 @@ fn main() {
             let username = username.as_str();
             let initial_stamp = stamp.as_str();
 
-            exact(
+            match exact(
                 username,
                 id,
                 initial_stamp,
@@ -386,23 +535,87 @@ fn main() {
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
                 },
-            );
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
         }
         Some(Commands::Link { progressbar, url }) => {
             let url = url.as_str();
-            let (_, data) = derive_date_from_url(&url);
+            let (proc, data) = match derive_date_from_url(&url) {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
 
-            exact(
-                &data.username,
-                data.broadcast_id.parse::<i64>().unwrap(),
-                &data.start_date,
-                Flags {
-                    verbose: matches.verbose,
-                    simple: matches.simple,
-                    pbar: progressbar,
-                    cdnfile: matches.cdnfile,
-                },
-            );
+            let fl = Flags {
+                verbose: matches.verbose,
+                simple: matches.simple,
+                pbar: progressbar,
+                cdnfile: matches.cdnfile,
+            };
+
+            match proc {
+                ProcessingType::Exact => {
+                    match exact(
+                        data.username.as_str(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
+                        data.start_date.as_str(),
+                        fl.clone(),
+                    ) {
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
+                    }
+                }
+                ProcessingType::Bruteforce => {
+                    let end_date = match data.end_date {
+                        Some(d) => d,
+                        None => {
+                            error!("Couldn't get the end date for the bruteforce method");
+                            return;
+                        }
+                    };
+                    match bruteforcer(
+                        data.username.as_str(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
+                        data.start_date.as_str(),
+                        end_date.as_str(),
+                        fl.clone(),
+                    ) {
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
+                    }
+                }
+            };
         }
         Some(Commands::Clip { progressbar, clip }) => {
             let fl = Flags {
@@ -413,13 +626,31 @@ fn main() {
             };
 
             match find_bid_from_clip(clip, fl.clone()) {
-                Some((username, vod)) => {
-                    let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                    let (_, data) = derive_date_from_url(&url);
+                Ok(r) => match r {
+                    Some((username, vod)) => {
+                        let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
+                        let (_, data) = match derive_date_from_url(&url) {
+                            Ok(a) => a,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        };
 
-                    exact(&username, vod, &data.start_date, fl);
+                        match exact(&username, vod, &data.start_date, fl) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        };
+                    }
+                    None => {}
+                },
+                Err(e) => {
+                    error!("{}", e);
+                    return;
                 }
-                None => {}
             }
         }
         Some(Commands::Clipforce {
@@ -445,7 +676,7 @@ fn main() {
             output,
             slow,
             progressbar,
-        }) => fix(
+        }) => match fix(
             url.as_str(),
             output,
             slow,
@@ -455,7 +686,13 @@ fn main() {
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
             },
-        ),
+        ) {
+            Ok(_) => {}
+            Err(e) => {
+                error!("{}", e);
+                return;
+            }
+        },
         _ => interface(matches),
     }
 }

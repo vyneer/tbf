@@ -1,19 +1,24 @@
 use colored::*;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator};
+use lazy_static::lazy_static;
 use log::{debug, error, info};
 use m3u8_rs::{parse_media_playlist_res, MediaPlaylist, MediaSegment};
 use rayon::prelude::*;
 use regex::Regex;
 use reqwest::StatusCode;
 use sha1::{Digest, Sha1};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::config::Flags;
+use crate::error::{PlaylistFixError, TimestampParserError};
 use crate::twitch::{
     check_availability,
     models::{ReturnURL, TwitchURL},
 };
 use crate::util::{compile_cdn_list, info, parse_timestamp};
+
+lazy_static! {
+    static ref FIX_REGEX: Regex = Regex::new(r"[^/]+").unwrap();
+}
 
 pub fn bruteforcer(
     username: &str,
@@ -21,11 +26,16 @@ pub fn bruteforcer(
     initial_from_stamp: &str,
     initial_to_stamp: &str,
     flags: Flags,
-) -> Option<Vec<ReturnURL>> {
-    let number1 = parse_timestamp(initial_from_stamp);
-    let number2 = parse_timestamp(initial_to_stamp);
+) -> Result<Option<Vec<ReturnURL>>, TimestampParserError> {
+    let number1 = match parse_timestamp(initial_from_stamp) {
+        Ok(d) => d,
+        Err(e) => return Err(e),
+    };
+    let number2 = match parse_timestamp(initial_to_stamp) {
+        Ok(d) => d,
+        Err(e) => return Err(e),
+    };
 
-    let final_url_check = AtomicBool::new(false);
     let mut all_formats_vec: Vec<TwitchURL> = Vec::new();
     if !flags.simple {
         info!("Starting!");
@@ -57,112 +67,102 @@ pub fn bruteforcer(
     let iter = all_formats_vec.par_iter();
     let iter_pb = all_formats_vec.par_iter().progress_with(pb);
 
-    let final_url: Vec<_>;
+    let final_url: Option<&TwitchURL>;
     if flags.pbar {
-        final_url = iter_pb.filter_map( |url| {
-            if !final_url_check.load(Ordering::SeqCst) {
-                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
-                match res {
-                    Ok(res) => {
-                        match res.status() {
-                            StatusCode::OK => {
-                                final_url_check.store(true, Ordering::SeqCst);
-                                if flags.verbose {
-                                    cloned_pb.println(format!("Got it! - {:?}", url));
-                                }
-                                Some(url)
+        final_url = iter_pb.find_any( |url| {
+            let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
+            match res {
+                Ok(res) => {
+                    match res.status() {
+                        StatusCode::OK => {
+                            if flags.verbose {
+                                cloned_pb.println(format!("Got it! - {:?}", url));
                             }
-                            StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
-                                if flags.verbose {
-                                    cloned_pb.println(format!("Still going - {:?}", url));
-                                }
-                                None
-                            }
-                            _ => {
-                                cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
-                                None
-                            }
+                            return true
                         }
-                    },
-                    Err(e) => {
-                        cloned_pb.println(format!("Reqwest error: {}", e));
-                        None
+                        StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
+                            if flags.verbose {
+                                cloned_pb.println(format!("Still going - {:?}", url));
+                            }
+                            return false
+                        }
+                        _ => {
+                            cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
+                            return false
+                        }
                     }
+                },
+                Err(e) => {
+                    cloned_pb.println(format!("Reqwest error: {}", e));
+                    return false
                 }
-            } else {
-                None
             }
-        }).collect();
+        })
     } else {
-        final_url = iter.filter_map( |url| {
-            if !final_url_check.load(Ordering::SeqCst) {
-                let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
-                match res {
-                    Ok(res) => {
-                        match res.status() {
-                            StatusCode::OK => {
-                                final_url_check.store(true, Ordering::SeqCst);
-                                debug!("Got it! - {:?}", url);
-                                Some(url)
-                            }
-                            StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
-                                debug!("Still going - {:?}", url);
-                                None
-                            }
-                            _ => {
-                                info(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()), flags.simple);
-                                None
-                            }
+        final_url = iter.find_any( |url| {
+            let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
+            match res {
+                Ok(res) => {
+                    match res.status() {
+                        StatusCode::OK => {
+                            debug!("Got it! - {:?}", url);
+                            return true
                         }
-                    },
-                    Err(e) => {
-                        info(format!("Reqwest error: {}", e), flags.simple);
-                        None
+                        StatusCode::FORBIDDEN | StatusCode::NOT_FOUND => {
+                            debug!("Still going - {:?}", url);
+                            return false
+                        }
+                        _ => {
+                            info(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()), flags.simple);
+                            return false
+                        }
                     }
+                },
+                Err(e) => {
+                    info(format!("Reqwest error: {}", e), flags.simple);
+                    return false
                 }
-            } else {
-                None
             }
-        }).collect();
+        });
     }
 
-    if !final_url.is_empty() {
-        let valid_urls = check_availability(
-            &final_url.get(0).unwrap().hash,
-            username,
-            vod,
-            &final_url.get(0).unwrap().timestamp,
-            flags.clone(),
-        );
-        if !valid_urls.is_empty() {
-            if !flags.simple {
-                info!(
-                    "Got the URL and it {} on Twitch servers. Here are the valid URLs:",
-                    "was available".green()
-                );
+    match final_url {
+        Some(final_url) => {
+            let valid_urls = check_availability(
+                &final_url.hash,
+                username,
+                vod,
+                &final_url.timestamp,
+                flags.clone(),
+            );
+            if !valid_urls.is_empty() {
+                if !flags.simple {
+                    info!(
+                        "Got the URL and it {} on Twitch servers. Here are the valid URLs:",
+                        "was available".green()
+                    );
+                }
+                for url in &valid_urls {
+                    info(url.playlist.clone(), flags.simple);
+                }
+                Ok(Some(valid_urls))
+            } else {
+                if !flags.simple {
+                    info!(
+                        "Got the URL and it {} on Twitch servers :(",
+                        "was NOT available".red()
+                    );
+                    info!("Here's the URL for debug purposes - {}", final_url.full_url);
+                }
+                Ok(None)
             }
-            for url in &valid_urls {
-                info(url.playlist.clone(), flags.simple);
-            }
-            Some(valid_urls)
-        } else {
-            if !flags.simple {
-                info!(
-                    "Got the URL and it {} on Twitch servers :(",
-                    "was NOT available".red()
-                );
-                info!(
-                    "Here's the URL for debug purposes - {}",
-                    final_url.get(0).unwrap().full_url
-                );
-            }
-            None
         }
-    } else {
-        if !flags.simple {
-            info!("{}", "Couldn't find anything :(".red());
+        None => {
+            if !flags.simple {
+                info!("{}", "Couldn't find anything :(".red());
+            }
+            Ok(None)
         }
-        None
     }
 }
 
@@ -171,8 +171,11 @@ pub fn exact(
     vod: i64,
     initial_stamp: &str,
     flags: Flags,
-) -> Option<Vec<ReturnURL>> {
-    let number = parse_timestamp(initial_stamp);
+) -> Result<Option<Vec<ReturnURL>>, TimestampParserError> {
+    let number = match parse_timestamp(initial_stamp) {
+        Ok(d) => d,
+        Err(e) => return Err(e),
+    };
 
     let mut hasher = Sha1::new();
     hasher.update(format!("{}_{}_{}", username, vod, number).as_str());
@@ -195,7 +198,7 @@ pub fn exact(
         for url in &valid_urls {
             info(url.playlist.clone(), flags.simple);
         }
-        Some(valid_urls)
+        Ok(Some(valid_urls))
     } else {
         if !flags.simple {
             info!(
@@ -204,19 +207,23 @@ pub fn exact(
             );
             info!("Here's the URL for debug purposes - https://vod-secure.twitch.tv/{}_{}_{}_{}/chunked/index-dvr.m3u8", &hex[0..20].to_string(), username, vod, &number);
         }
-        None
+        Ok(None)
     }
 }
 
-pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) {
+pub fn fix(
+    url: &str,
+    output: Option<String>,
+    old_method: bool,
+    flags: Flags,
+) -> Result<(), PlaylistFixError> {
     if !(url.contains("twitch.tv") || url.contains("cloudfront.net")) {
-        panic!("Only twitch.tv and cloudfront.net URLs are supported");
+        error!("Only twitch.tv and cloudfront.net URLs are supported");
+        return Err(PlaylistFixError::URLError);
     }
 
-    let re = Regex::new(r"[^/]+").unwrap();
-
     let mut base_url_parts: Vec<String> = Vec::new();
-    for elem in re.captures_iter(&url) {
+    for elem in FIX_REGEX.captures_iter(&url) {
         base_url_parts.push(elem[0].to_string());
     }
     let base_url = format!(
@@ -224,8 +231,14 @@ pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) {
         base_url_parts[1], base_url_parts[2], base_url_parts[3]
     );
 
-    let res = crate::HTTP_CLIENT.get(url).send().unwrap();
-    let body = res.text().unwrap();
+    let res = match crate::HTTP_CLIENT.get(url).send() {
+        Ok(r) => r,
+        Err(e) => return Err(e)?,
+    };
+    let body = match res.text() {
+        Ok(r) => r,
+        Err(e) => return Err(e)?,
+    };
 
     let bytes = body.into_bytes();
 
@@ -374,6 +387,125 @@ pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) {
         }
     };
 
-    let mut file = std::fs::File::create(path).unwrap();
-    playlist.write_to(&mut file).unwrap();
+    let mut file = match std::fs::File::create(path) {
+        Ok(e) => e,
+        Err(e) => return Err(e)?,
+    };
+    match playlist.write_to(&mut file) {
+        Ok(_) => {}
+        Err(e) => return Err(e)?,
+    };
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::BufRead, io::BufReader};
+
+    use tempfile::tempdir;
+
+    use crate::{config::Flags, twitch::models::ReturnURL};
+
+    use super::{bruteforcer, exact as ex, fix};
+
+    #[test]
+    fn bruteforce() {
+        let bf = bruteforcer(
+            &"dansgaming",
+            42218705421,
+            &"2021-06-05 00:50:16",
+            &"2021-06-05 00:50:18",
+            Flags::default(),
+        )
+        .unwrap()
+        .unwrap();
+        let bf_comp: Vec<ReturnURL> = vec![ReturnURL {
+            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }, ReturnURL {
+            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }];
+
+        assert_eq!(bf, bf_comp, "testing bruteforce with results");
+
+        let bf_wrong = bruteforcer(
+            &"dansgming",
+            42218705421,
+            &"2021-06-05 00:50:16",
+            &"2021-06-05 00:50:18",
+            Flags::default(),
+        )
+        .unwrap();
+
+        assert_eq!(bf_wrong, None, "testing bruteforce with no results");
+
+        let bf_err = bruteforcer(
+            &"mrmouton",
+            39905263305,
+            &"2022-07-12 1200",
+            &"2022-07-12 12:00:41",
+            Flags::default(),
+        );
+
+        assert!(bf_err.is_err(), "testing invalid bruteforce");
+    }
+
+    #[test]
+    fn exact() {
+        let e = ex(
+            &"dansgaming",
+            42218705421,
+            &"2021-06-05 00:50:17",
+            Flags::default(),
+        )
+        .unwrap()
+        .unwrap();
+        let e_comp: Vec<ReturnURL> = vec![ReturnURL {
+            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }, ReturnURL {
+            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            muted: false,
+        }];
+
+        assert_eq!(e, e_comp, "testing exact with results");
+
+        let e_wrong = ex(
+            &"dansgming",
+            42218705421,
+            &"2021-06-05 00:50:17",
+            Flags::default(),
+        )
+        .unwrap();
+
+        assert_eq!(e_wrong, None, "testing exact with no results");
+
+        let e_err = ex(
+            &"mrmouton",
+            39905263305,
+            &"2022-07-12 1200",
+            Flags::default(),
+        );
+
+        assert!(e_err.is_err(), "testing invalid exact");
+    }
+
+    #[test]
+    fn fix_playlist() {
+        let dir = tempdir().unwrap();
+
+        let path = dir.path().join("test.m3u8");
+
+        fix(&"https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8", Some(path.to_str().unwrap().to_string()), false, Flags::default()).unwrap();
+
+        let r = BufReader::new(File::open(path).unwrap());
+        let mut count = 0;
+
+        for _ in r.lines() {
+            count = count + 1;
+        }
+
+        assert_eq!(count, 2081);
+    }
 }

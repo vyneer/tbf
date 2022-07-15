@@ -10,6 +10,17 @@ pub struct Flags {
     pub cdnfile: Option<String>,
 }
 
+impl Default for Flags {
+    fn default() -> Self {
+        Flags {
+            verbose: false,
+            simple: false,
+            pbar: false,
+            cdnfile: None,
+        }
+    }
+}
+
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Cli {
