@@ -49,6 +49,14 @@ Go over a range of timestamps, looking for clips in a VOD.
 
 Get the m3u8 from a TwitchTracker/StreamsCharts URL.
 
+### live
+
+```tbf link [FLAGS] <username>```
+
+```tbf live forsen```
+
+Get the m3u8 from a currently running stream.
+
 ### clip
 
 ```tbf clip [FLAGS] <clip>```

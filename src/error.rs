@@ -37,33 +37,57 @@ impl Display for PlaylistFixError {
 impl Error for PlaylistFixError {}
 
 #[derive(Debug)]
-pub enum TimestampParserError {
+pub enum VodError {
     IntegerParseError(ParseIntError),
     StringParseError(Parse),
+    HeaderNameError(InvalidHeaderName),
+    HeaderValueError(InvalidHeaderValue),
+    UrlProcessError(reqwest::Error),
 }
 
-impl From<ParseIntError> for TimestampParserError {
+impl From<InvalidHeaderName> for VodError {
+    fn from(e: InvalidHeaderName) -> Self {
+        Self::HeaderNameError(e)
+    }
+}
+
+impl From<InvalidHeaderValue> for VodError {
+    fn from(e: InvalidHeaderValue) -> Self {
+        Self::HeaderValueError(e)
+    }
+}
+
+impl From<reqwest::Error> for VodError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::UrlProcessError(e)
+    }
+}
+
+impl From<ParseIntError> for VodError {
     fn from(e: ParseIntError) -> Self {
         Self::IntegerParseError(e)
     }
 }
 
-impl From<Parse> for TimestampParserError {
+impl From<Parse> for VodError {
     fn from(e: Parse) -> Self {
         Self::StringParseError(e)
     }
 }
 
-impl Display for TimestampParserError {
+impl Display for VodError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::IntegerParseError(e) => write!(f, "couldn't parse the unix timestamp: {}", e),
             Self::StringParseError(e) => write!(f, "couldn't parse the string timestamp: {}", e),
+            Self::HeaderNameError(e) => write!(f, "invalid header name: {}", e),
+            Self::HeaderValueError(e) => write!(f, "invalid header value: {}", e),
+            Self::UrlProcessError(e) => write!(f, "couldn't process the url: {}", e),
         }
     }
 }
 
-impl Error for TimestampParserError {}
+impl Error for VodError {}
 
 #[derive(Debug)]
 pub enum DeriveDateError {
@@ -71,7 +95,7 @@ pub enum DeriveDateError {
     ScraperElementError,
     ScraperAttributeError,
     SelectorError,
-    TimestampParserError(TimestampParserError),
+    TimestampParserError(VodError),
     UrlProcessError(reqwest::Error),
     UrlParseError(UrlPError),
     WrongURLError(String),
@@ -83,8 +107,8 @@ impl<'a> From<ParseError<'a, SelectorParseErrorKind<'a>>> for DeriveDateError {
     }
 }
 
-impl From<TimestampParserError> for DeriveDateError {
-    fn from(e: TimestampParserError) -> Self {
+impl From<VodError> for DeriveDateError {
+    fn from(e: VodError) -> Self {
         Self::TimestampParserError(e)
     }
 }

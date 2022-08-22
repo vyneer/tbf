@@ -1,3 +1,4 @@
+use anyhow::Result;
 use colored::*;
 use indicatif::{ParallelProgressIterator, ProgressBar};
 use log::{error, info};
@@ -11,7 +12,7 @@ use crate::error::ClipError;
 use crate::twitch::models;
 use crate::util::info;
 
-fn extract_slug(s: String) -> Result<Option<String>, ClipError> {
+fn extract_slug(s: String) -> Result<Option<String>> {
     match Url::parse(s.as_str()) {
         Ok(resolved_url) => match resolved_url.domain() {
             Some(domain) => match domain.to_lowercase().as_str() {
@@ -22,16 +23,16 @@ fn extract_slug(s: String) -> Result<Option<String>, ClipError> {
                         .ok_or(ClipError::SegmentMapError)
                     {
                         Ok(s) => s,
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e)?,
                     };
                     if segments.len() > 1 {
                         if segments[1] == "clip" {
                             return Ok(Some(segments[2].to_string()));
                         } else {
-                            return Err(ClipError::WrongURLError("Not a clip URL".to_string()));
+                            return Err(ClipError::WrongURLError("Not a clip URL".to_string()))?;
                         };
                     } else {
-                        return Err(ClipError::WrongURLError("Not a clip URL".to_string()));
+                        return Err(ClipError::WrongURLError("Not a clip URL".to_string()))?;
                     }
                 }
                 "clips.twitch.tv" => {
@@ -41,27 +42,27 @@ fn extract_slug(s: String) -> Result<Option<String>, ClipError> {
                         .ok_or(ClipError::SegmentMapError)
                     {
                         Ok(s) => s,
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e)?,
                     };
                     return Ok(Some(segments[0].to_string()));
                 }
                 _ => {
                     return Err(ClipError::WrongURLError(
                         "Only twitch.tv URLs are supported".to_string(),
-                    ))
+                    ))?
                 }
             },
             None => {
                 return Err(ClipError::WrongURLError(
                     "Only twitch.tv URLs are supported".to_string(),
-                ))
+                ))?
             }
         },
         Err(_) => Ok(Some(s)),
     }
 }
 
-pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64)>, ClipError> {
+pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64)>> {
     let slug = match extract_slug(s) {
         Ok(s) => match s {
             Some(s) => s,
@@ -88,9 +89,9 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
         header_map.insert(key, val);
     }
 
-    let query = models::Query {
+    let query = models::ClipQuery {
         query: "query($slug:ID!){clip(slug: $slug){broadcaster{login}broadcast{id}}}".to_string(),
-        variables: models::Vars { slug },
+        variables: models::ClipVars { slug },
     };
 
     let request = crate::HTTP_CLIENT
@@ -102,7 +103,7 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
         Ok(r) => r,
         Err(e) => return Err(e)?,
     };
-    let data: models::Response = match re.json() {
+    let data: models::ClipResponse = match re.json() {
         Ok(d) => d,
         Err(e) => {
             if !flags.simple {

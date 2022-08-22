@@ -16,7 +16,7 @@ use std::{
 use config::{Cli, Commands, Flags};
 use twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
-    vods::{bruteforcer, exact, fix},
+    vods::{bruteforcer, exact, fix, live},
 };
 use util::{any_key_to_continue, derive_date_from_url, trim_newline, ProcessingType};
 
@@ -32,12 +32,13 @@ fn interface(matches: Cli) {
     println!("[1] Exact mode - Combine all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL and check whether the VOD is available");
     println!("[2] Bruteforce mode - Go over a range of timestamps, looking for a usable/working m3u8 URL, and check whether the VOD is available");
     println!("[3] Link mode - Get the m3u8 from a TwitchTracker/StreamsCharts URL");
-    println!("[4] Clip mode - Get the m3u8 from a clip using TwitchTracker");
+    println!("[4] Live mode - Get the m3u8 from a currently running stream");
+    println!("[5] Clip mode - Get the m3u8 from a clip using TwitchTracker");
     println!(
-        "[5] Clip bruteforce mode - Go over a range of timestamps, looking for clips in a VOD"
+        "[6] Clip bruteforce mode - Go over a range of timestamps, looking for clips in a VOD"
     );
     println!(
-        "[6] Fix playlist - Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one"
+        "[7] Fix playlist - Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one"
     );
 
     stdin().read_line(&mut mode).expect("Failed to read line.");
@@ -299,6 +300,57 @@ fn interface(matches: Cli) {
             return;
         }
         "4" => {
+            let mut username = String::new();
+
+            println!("Please enter the streamer's username:");
+            stdin()
+                .read_line(&mut username)
+                .expect("Failed to read line.");
+            trim_newline(&mut username);
+
+            let fl = Flags {
+                verbose: false,
+                simple: false,
+                pbar: true,
+                cdnfile: matches.cdnfile,
+            };
+
+            let valid_urls = match live(username.as_str(), fl.clone()) {
+                Ok(u) => match u {
+                    Some(u) => u,
+                    None => Vec::new(),
+                },
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+            if !valid_urls.is_empty() {
+                if valid_urls[0].muted {
+                    let mut response = String::new();
+
+                    println!("Do you want to download the fixed playlist? (Y/n)");
+                    stdin()
+                        .read_line(&mut response)
+                        .expect("Failed to read line.");
+                    trim_newline(&mut response);
+
+                    match response.to_lowercase().as_str() {
+                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            }
+
+            return;
+        }
+        "5" => {
             let mut clip = String::new();
 
             println!("Please enter the clip's URL (twitch.tv/%username%/clip/%slug% and clips.twitch.tv/%slug% are both supported) or the slug (\"GentleAthleticWombatHoneyBadger-ohJAsKzGinIgFUx2\" for example):");
@@ -375,7 +427,7 @@ fn interface(matches: Cli) {
 
             return;
         }
-        "5" => {
+        "6" => {
             let mut vod = String::new();
             let mut start = String::new();
             let mut end = String::new();
@@ -426,7 +478,7 @@ fn interface(matches: Cli) {
 
             return;
         }
-        "6" => {
+        "7" => {
             let mut url = String::new();
 
             println!("Please enter Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported):");
@@ -529,6 +581,28 @@ fn main() {
                 username,
                 id,
                 initial_stamp,
+                Flags {
+                    verbose: matches.verbose,
+                    simple: matches.simple,
+                    pbar: progressbar,
+                    cdnfile: matches.cdnfile,
+                },
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
+            };
+        }
+        Some(Commands::Live {
+            progressbar,
+            username,
+        }) => {
+            let username = username.as_str();
+
+            match live(
+                username,
                 Flags {
                     verbose: matches.verbose,
                     simple: matches.simple,

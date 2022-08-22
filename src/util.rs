@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crossterm::event;
 use lazy_static::lazy_static;
 use log::debug;
@@ -19,7 +20,7 @@ use time::{
 use url::Url;
 
 use super::config::CURL_UA;
-use crate::error::{DeriveDateError, TimestampParserError};
+use crate::error::DeriveDateError;
 use crate::twitch::models::CDN_URLS;
 
 lazy_static! {
@@ -94,29 +95,29 @@ pub fn get_random_useragent() -> String {
     return CURL_UA.to_string();
 }
 
-fn process_url(url: &str) -> Result<Html, reqwest::Error> {
+fn process_url(url: &str) -> Result<Html> {
     let init_resp = match crate::HTTP_CLIENT
         .get(url)
         .header(USER_AGENT, get_random_useragent())
         .send()
     {
         Ok(r) => r,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
 
     let resp = match init_resp.error_for_status() {
         Ok(e) => e,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
 
     let body = match resp.text() {
         Ok(b) => b,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
     Ok(Html::parse_document(&body))
 }
 
-pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), DeriveDateError> {
+pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
     match Url::parse(url) {
         Ok(resolved_url) => match resolved_url.domain() {
             Some(domain) => match domain.to_lowercase().as_str() {
@@ -127,7 +128,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                         .ok_or(DeriveDateError::SegmentMapError)
                     {
                         Ok(s) => s,
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e)?,
                     };
                     if segments.len() == 3 {
                         if segments[1] == "streams" {
@@ -140,7 +141,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                             let selector =
                                 match Selector::parse(".stream-timestamp-dt.to-dowdatetime") {
                                     Ok(s) => s,
-                                    Err(e) => Err(e)?,
+                                    Err(_) => return Err(DeriveDateError::SelectorError)?,
                                 };
 
                             let date = match fragment
@@ -149,7 +150,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                                 .ok_or(DeriveDateError::ScraperElementError)
                             {
                                 Ok(d) => d.text().collect::<String>(),
-                                Err(e) => return Err(e),
+                                Err(e) => return Err(e)?,
                             };
 
                             return Ok((
@@ -164,12 +165,12 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                         } else {
                             return Err(DeriveDateError::WrongURLError(
                                 "Not a valid TwitchTracker VOD URL".to_string(),
-                            ));
+                            ))?;
                         };
                     } else {
                         return Err(DeriveDateError::WrongURLError(
                             "Not a valid TwitchTracker VOD URL".to_string(),
-                        ));
+                        ))?;
                     };
                 }
                 "streamscharts.com" | "www.streamscharts.com" => {
@@ -179,7 +180,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                         .ok_or(DeriveDateError::SegmentMapError)
                     {
                         Ok(s) => s,
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e)?,
                     };
                     if segments.len() == 4 {
                         if segments[0] == "channels" && segments[2] == "streams" {
@@ -191,7 +192,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                             };
                             let selector = match Selector::parse("time") {
                                 Ok(s) => s,
-                                Err(e) => Err(e)?,
+                                Err(_) => Err(DeriveDateError::SelectorError)?,
                             };
 
                             let date_init = match fragment
@@ -206,10 +207,10 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                                         .ok_or(DeriveDateError::ScraperAttributeError)
                                     {
                                         Ok(s) => s.to_string(),
-                                        Err(e) => return Err(e),
+                                        Err(e) => return Err(e)?,
                                     }
                                 }
-                                Err(e) => return Err(e),
+                                Err(e) => return Err(e)?,
                             };
 
                             let date_parsed = match parse_timestamp(&date_init) {
@@ -231,32 +232,32 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData), Deri
                         } else {
                             return Err(DeriveDateError::WrongURLError(
                                 "Not a valid StreamsCharts VOD URL".to_string(),
-                            ));
+                            ))?;
                         };
                     } else {
                         return Err(DeriveDateError::WrongURLError(
                             "Not a valid StreamsCharts VOD URL".to_string(),
-                        ));
+                        ))?;
                     };
                 }
                 _ => {
                     return Err(DeriveDateError::WrongURLError(
                         "Only twitchtracker.com and streamscharts.com URLs are supported"
                             .to_string(),
-                    ))
+                    ))?
                 }
             },
             None => {
                 return Err(DeriveDateError::WrongURLError(
                     "Only twitchtracker.com and streamscharts.com URLs are supported".to_string(),
-                ))
+                ))?
             }
         },
         Err(e) => return Err(e)?,
     }
 }
 
-pub fn parse_timestamp(timestamp: &str) -> Result<i64, TimestampParserError> {
+pub fn parse_timestamp(timestamp: &str) -> Result<i64> {
     let format_with_utc = format_description!("[year]-[month]-[day] [hour]:[minute]:[second] UTC");
     let format_wo_utc = format_description!("[year]-[month]-[day] [hour]:[minute]:[second]");
     let format_wo_sec = format_description!("[day]-[month]-[year] [hour]:[minute]");

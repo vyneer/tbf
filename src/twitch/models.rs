@@ -52,18 +52,40 @@ pub struct ReturnURL {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Response {
-    pub data: Data,
+pub struct ClipResponse {
+    pub data: ClipData,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Data {
+pub struct VodResponse {
+    pub data: VodData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct ClipData {
     pub clip: Clip,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct VodData {
+    pub user: User,
 }
 #[derive(Deserialize, Debug)]
 pub struct Clip {
     pub broadcaster: Broadcaster,
     pub broadcast: Broadcast,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct User {
+    pub stream: Option<Stream>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Stream {
+    pub id: String,
+    #[serde(alias = "createdAt")]
+    pub created_at: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -77,12 +99,23 @@ pub struct Broadcast {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Vars {
+pub struct ClipVars {
     pub slug: String,
 }
 
 #[derive(Serialize, Debug)]
-pub struct Query {
+pub struct VodVars {
+    pub login: String,
+}
+
+#[derive(Serialize, Debug)]
+pub struct ClipQuery {
     pub query: String,
-    pub variables: Vars,
+    pub variables: ClipVars,
+}
+
+#[derive(Serialize, Debug)]
+pub struct VodQuery {
+    pub query: String,
+    pub variables: VodVars,
 }

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use colored::*;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressIterator};
 use lazy_static::lazy_static;
@@ -9,7 +10,7 @@ use reqwest::StatusCode;
 use sha1::{Digest, Sha1};
 
 use crate::config::Flags;
-use crate::error::{PlaylistFixError, TimestampParserError};
+use crate::error::PlaylistFixError;
 use crate::twitch::{
     check_availability,
     models::{ReturnURL, TwitchURL},
@@ -26,14 +27,14 @@ pub fn bruteforcer(
     initial_from_stamp: &str,
     initial_to_stamp: &str,
     flags: Flags,
-) -> Result<Option<Vec<ReturnURL>>, TimestampParserError> {
+) -> Result<Option<Vec<ReturnURL>>> {
     let number1 = match parse_timestamp(initial_from_stamp) {
         Ok(d) => d,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
     let number2 = match parse_timestamp(initial_to_stamp) {
         Ok(d) => d,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
 
     let mut all_formats_vec: Vec<TwitchURL> = Vec::new();
@@ -171,10 +172,10 @@ pub fn exact(
     vod: i64,
     initial_stamp: &str,
     flags: Flags,
-) -> Result<Option<Vec<ReturnURL>>, TimestampParserError> {
+) -> Result<Option<Vec<ReturnURL>>> {
     let number = match parse_timestamp(initial_stamp) {
         Ok(d) => d,
-        Err(e) => return Err(e),
+        Err(e) => return Err(e)?,
     };
 
     let mut hasher = Sha1::new();
@@ -211,15 +212,10 @@ pub fn exact(
     }
 }
 
-pub fn fix(
-    url: &str,
-    output: Option<String>,
-    old_method: bool,
-    flags: Flags,
-) -> Result<(), PlaylistFixError> {
+pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) -> Result<()> {
     if !(url.contains("twitch.tv") || url.contains("cloudfront.net")) {
         error!("Only twitch.tv and cloudfront.net URLs are supported");
-        return Err(PlaylistFixError::URLError);
+        return Err(PlaylistFixError::URLError)?;
     }
 
     let mut base_url_parts: Vec<String> = Vec::new();
@@ -396,6 +392,83 @@ pub fn fix(
         Err(e) => return Err(e)?,
     };
     Ok(())
+}
+
+pub fn live(username: &str, flags: Flags) -> Result<Option<Vec<ReturnURL>>> {
+    match util::find_bid_from_username(username, flags.clone()) {
+        Ok(res) => match res {
+            Some((bid, stamp)) => exact(username, bid, stamp.as_str(), flags),
+            None => Ok(None),
+        },
+        Err(e) => return Err(e)?,
+    }
+}
+
+mod util {
+    use anyhow::Result;
+    use log::error;
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    use std::{collections::HashMap, str::FromStr};
+
+    use crate::config::Flags;
+    use crate::twitch::models::{VodQuery, VodResponse, VodVars};
+
+    pub fn find_bid_from_username(username: &str, flags: Flags) -> Result<Option<(i64, String)>> {
+        let endpoint = "https://gql.twitch.tv/gql";
+        let mut headers = HashMap::new();
+        headers.insert("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko");
+
+        let mut header_map = HeaderMap::new();
+
+        for (str_key, str_value) in headers {
+            let key = match HeaderName::from_str(str_key) {
+                Ok(h) => h,
+                Err(e) => return Err(e)?,
+            };
+            let val = match HeaderValue::from_str(str_value) {
+                Ok(h) => h,
+                Err(e) => return Err(e)?,
+            };
+
+            header_map.insert(key, val);
+        }
+
+        let query = VodQuery {
+            query: "query($login:String){user(login: $login){stream{id createdAt}}}".to_string(),
+            variables: VodVars {
+                login: username.to_string(),
+            },
+        };
+
+        let request = crate::HTTP_CLIENT
+            .post(endpoint)
+            .json(&query)
+            .headers(header_map.clone());
+
+        let re = match request.send() {
+            Ok(r) => r,
+            Err(e) => return Err(e)?,
+        };
+        let data: VodResponse = match re.json() {
+            Ok(d) => d,
+            Err(e) => {
+                if !flags.simple {
+                    error!("Couldn't get the info from the clip: {}", e);
+                }
+                return Ok(None);
+            }
+        };
+        match data.data.user.stream {
+            Some(d) => Ok(Some((
+                match d.id.parse::<i64>() {
+                    Ok(i) => i,
+                    Err(e) => return Err(e)?,
+                },
+                d.created_at,
+            ))),
+            None => Ok(None),
+        }
+    }
 }
 
 #[cfg(test)]

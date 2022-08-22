@@ -87,6 +87,16 @@ pub enum Commands {
         url: String,
     },
 
+    /// Get the m3u8 from a currently running stream
+    Live {
+        /// Enable a progress bar (the progress bar slightly slows down the processing)
+        #[clap(short, long)]
+        progressbar: bool,
+
+        /// Streamer's username (string)
+        username: String,
+    },
+
     /// Get the m3u8 from a clip using TwitchTracker
     Clip {
         /// Enable a progress bar (the progress bar slightly slows down the processing)
