@@ -453,7 +453,7 @@ mod util {
             Ok(d) => d,
             Err(e) => {
                 if !flags.simple {
-                    error!("Couldn't get the info from the clip: {}", e);
+                    error!("Couldn't get the info from the username: {}", e);
                 }
                 return Ok(None);
             }
