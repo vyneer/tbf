@@ -1,6 +1,4 @@
-use cssparser::ParseError;
 use reqwest::header::{InvalidHeaderName, InvalidHeaderValue};
-use selectors::parser::SelectorParseErrorKind;
 use std::{error::Error, fmt::Display, num::ParseIntError};
 use time::error::Parse;
 use url::ParseError as UrlPError;
@@ -99,12 +97,6 @@ pub enum DeriveDateError {
     UrlProcessError(reqwest::Error),
     UrlParseError(UrlPError),
     WrongURLError(String),
-}
-
-impl<'a> From<ParseError<'a, SelectorParseErrorKind<'a>>> for DeriveDateError {
-    fn from(_: ParseError<'a, SelectorParseErrorKind<'a>>) -> Self {
-        Self::SelectorError
-    }
 }
 
 impl From<VodError> for DeriveDateError {
