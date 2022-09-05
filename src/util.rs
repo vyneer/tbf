@@ -1,5 +1,8 @@
 use anyhow::Result;
-use crossterm::event;
+use crossterm::{
+    event,
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 use lazy_static::lazy_static;
 use log::debug;
 use log::info;
@@ -48,9 +51,11 @@ pub struct CDNFile {
 }
 
 pub fn any_key_to_continue(text: &str) {
-    print!("{}", text);
+    enable_raw_mode().unwrap();
+    print!("\n{}", text);
     stdout().flush().unwrap_or(());
     event::read().unwrap();
+    disable_raw_mode().unwrap();
 }
 
 pub fn info(text: String, simple: bool) {
