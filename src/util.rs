@@ -78,10 +78,12 @@ pub fn get_random_useragent() -> String {
     match resp {
         Ok(r) => match r.status().is_success() {
             true => {
-                let useragent_vec: Vec<String> = match r.json() {
+                let mut useragent_vec: Vec<String> = match r.json() {
                     Ok(v) => v,
                     Err(_) => return CURL_UA.to_string(),
                 };
+                // apparently streamscharts doesnt like when the useragent has "X11" in it
+                useragent_vec.retain(|a| !a.contains("X11;"));
                 return match useragent_vec.choose(&mut rand::thread_rng()) {
                     Some(ua) => ua.to_owned(),
                     None => CURL_UA.to_string(),
@@ -96,11 +98,9 @@ pub fn get_random_useragent() -> String {
 }
 
 fn process_url(url: &str) -> Result<Html> {
-    let init_resp = match crate::HTTP_CLIENT
-        .get(url)
-        .header(USER_AGENT, get_random_useragent())
-        .send()
-    {
+    let ua = get_random_useragent();
+    debug!("Using UA - {}", ua);
+    let init_resp = match crate::HTTP_CLIENT.get(url).header(USER_AGENT, ua).send() {
         Ok(r) => r,
         Err(e) => return Err(e)?,
     };
