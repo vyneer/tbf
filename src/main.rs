@@ -242,37 +242,6 @@ fn interface(matches: Cli) {
                         }
                     }
                 }
-                ProcessingType::Bruteforce => {
-                    let end_date = match data.end_date {
-                        Some(d) => d,
-                        None => {
-                            error!("Couldn't get the end date for the bruteforce method");
-                            return;
-                        }
-                    };
-                    match bruteforcer(
-                        data.username.as_str(),
-                        match data.broadcast_id.parse::<i64>() {
-                            Ok(b) => b,
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
-                            }
-                        },
-                        data.start_date.as_str(),
-                        end_date.as_str(),
-                        fl.clone(),
-                    ) {
-                        Ok(u) => match u {
-                            Some(u) => u,
-                            None => Vec::new(),
-                        },
-                        Err(e) => {
-                            error!("{}", e);
-                            return;
-                        }
-                    }
-                }
             };
             if !valid_urls.is_empty() {
                 if valid_urls[0].muted {
@@ -646,37 +615,6 @@ fn main() {
                             }
                         },
                         data.start_date.as_str(),
-                        fl.clone(),
-                    ) {
-                        Ok(u) => match u {
-                            Some(u) => u,
-                            None => Vec::new(),
-                        },
-                        Err(e) => {
-                            error!("{}", e);
-                            return;
-                        }
-                    }
-                }
-                ProcessingType::Bruteforce => {
-                    let end_date = match data.end_date {
-                        Some(d) => d,
-                        None => {
-                            error!("Couldn't get the end date for the bruteforce method");
-                            return;
-                        }
-                    };
-                    match bruteforcer(
-                        data.username.as_str(),
-                        match data.broadcast_id.parse::<i64>() {
-                            Ok(b) => b,
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
-                            }
-                        },
-                        data.start_date.as_str(),
-                        end_date.as_str(),
                         fl.clone(),
                     ) {
                         Ok(u) => match u {

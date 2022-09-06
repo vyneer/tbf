@@ -33,8 +33,7 @@ lazy_static! {
 
 #[derive(Debug, PartialEq)]
 pub enum ProcessingType {
-    Exact,
-    Bruteforce,
+    Exact
 }
 
 #[derive(Debug, PartialEq)]
@@ -48,6 +47,12 @@ pub struct URLData {
 #[derive(Debug, Deserialize)]
 pub struct CDNFile {
     cdns: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StreamsChartsTwitchClip {
+    started_at: String,
+    ended_at: String,
 }
 
 pub fn any_key_to_continue(text: &str) {
@@ -200,12 +205,12 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
                                 Ok(f) => f,
                                 Err(e) => Err(e)?,
                             };
-                            let selector = match Selector::parse("time") {
+                            let selector = match Selector::parse("div > div[data-requests]") {
                                 Ok(s) => s,
                                 Err(_) => Err(DeriveDateError::SelectorError)?,
                             };
 
-                            let date_init = match fragment
+                            let clips_json = match fragment
                                 .select(&selector)
                                 .nth(0)
                                 .ok_or(DeriveDateError::ScraperElementError)
@@ -213,7 +218,7 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
                                 Ok(d) => {
                                     match d
                                         .value()
-                                        .attr("datetime")
+                                        .attr("data-requests")
                                         .ok_or(DeriveDateError::ScraperAttributeError)
                                     {
                                         Ok(s) => s.to_string(),
@@ -223,20 +228,24 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
                                 Err(e) => return Err(e)?,
                             };
 
-                            let date_parsed = match parse_timestamp(&date_init) {
+                            // Parse the clips_json into the struct StreamsChartsTwitchClips with serde_json
+                            let clips_payloads: Vec<StreamsChartsTwitchClip> = serde_json::from_str(&clips_json).unwrap();
+                            let start_dt_parsed = match parse_timestamp(&clips_payloads.first().unwrap().started_at) {
                                 Ok(d) => d,
                                 Err(e) => return Err(e)?,
                             };
-                            let start_date = date_parsed - 60;
-                            let end_date = date_parsed + 60;
+                            let end_dt_parsed = match parse_timestamp(&clips_payloads.last().unwrap().ended_at) {
+                                Ok(d) => d,
+                                Err(e) => return Err(e)?,
+                            };
 
                             return Ok((
-                                ProcessingType::Bruteforce,
+                                ProcessingType::Exact,
                                 URLData {
                                     username: username.to_string(),
                                     broadcast_id: broadcast_id.to_string(),
-                                    start_date: start_date.to_string(),
-                                    end_date: Some(end_date.to_string()),
+                                    start_date: start_dt_parsed.to_string(),
+                                    end_date: Some(end_dt_parsed.to_string()),
                                 },
                             ));
                         } else {
@@ -578,12 +587,12 @@ mod tests {
             derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384")
                 .unwrap(),
             (
-                ProcessingType::Bruteforce,
+                ProcessingType::Exact,
                 URLData {
                     username: "forsen".to_string(),
                     broadcast_id: "39619965384".to_string(),
-                    start_date: "1657645440".to_string(),
-                    end_date: Some("1657645560".to_string())
+                    start_date: "1657645508".to_string(),
+                    end_date: Some("1657666800".to_string())
                 }
             ),
             "testing streamscharts - https://streamscharts.com/channels/forsen/streams/39619965384"
