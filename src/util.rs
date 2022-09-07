@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::{
-    event,
+    event::{self, Event},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use lazy_static::lazy_static;
@@ -54,7 +54,12 @@ pub fn any_key_to_continue(text: &str) {
     enable_raw_mode().unwrap();
     print!("\n{}", text);
     stdout().flush().unwrap_or(());
-    event::read().unwrap();
+    loop {
+        match event::read().unwrap() {
+            Event::Key(..) => break,
+            _ => (),
+        };
+    }
     disable_raw_mode().unwrap();
 }
 
