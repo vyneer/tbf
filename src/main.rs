@@ -203,7 +203,7 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let (proc, data) = match derive_date_from_url(&url) {
+            let (proc, data) = match derive_date_from_url(&url, None) {
                 Ok(a) => a,
                 Err(e) => {
                     error!("{}", e);
@@ -230,6 +230,37 @@ fn interface(matches: Cli) {
                             }
                         },
                         data.start_date.as_str(),
+                        fl.clone(),
+                    ) {
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
+                    }
+                }
+                ProcessingType::Bruteforce => {
+                    let end_date = match data.end_date {
+                        Some(d) => d,
+                        None => {
+                            error!("Couldn't get the end date for the bruteforce method");
+                            return;
+                        }
+                    };
+                    match bruteforcer(
+                        data.username.as_str(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
+                        data.start_date.as_str(),
+                        end_date.as_str(),
                         fl.clone(),
                     ) {
                         Ok(u) => match u {
@@ -337,7 +368,7 @@ fn interface(matches: Cli) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url) {
+                        let (_, data) = match derive_date_from_url(&url, None) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);
@@ -588,7 +619,7 @@ fn main() {
         }
         Some(Commands::Link { progressbar, url }) => {
             let url = url.as_str();
-            let (proc, data) = match derive_date_from_url(&url) {
+            let (proc, data) = match derive_date_from_url(&url, None) {
                 Ok(a) => a,
                 Err(e) => {
                     error!("{}", e);
@@ -627,6 +658,37 @@ fn main() {
                         }
                     }
                 }
+                ProcessingType::Bruteforce => {
+                    let end_date = match data.end_date {
+                        Some(d) => d,
+                        None => {
+                            error!("Couldn't get the end date for the bruteforce method");
+                            return;
+                        }
+                    };
+                    match bruteforcer(
+                        data.username.as_str(),
+                        match data.broadcast_id.parse::<i64>() {
+                            Ok(b) => b,
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
+                            }
+                        },
+                        data.start_date.as_str(),
+                        end_date.as_str(),
+                        fl.clone(),
+                    ) {
+                        Ok(u) => match u {
+                            Some(u) => u,
+                            None => Vec::new(),
+                        },
+                        Err(e) => {
+                            error!("{}", e);
+                            return;
+                        }
+                    }
+                }
             };
         }
         Some(Commands::Clip { progressbar, clip }) => {
@@ -641,7 +703,7 @@ fn main() {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url) {
+                        let (_, data) = match derive_date_from_url(&url, None) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);

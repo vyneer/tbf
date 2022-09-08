@@ -33,7 +33,8 @@ lazy_static! {
 
 #[derive(Debug, PartialEq)]
 pub enum ProcessingType {
-    Exact
+    Exact,
+    Bruteforce,
 }
 
 #[derive(Debug, PartialEq)]
@@ -53,6 +54,12 @@ pub struct CDNFile {
 pub struct StreamsChartsTwitchClip {
     started_at: String,
     ended_at: String,
+}
+#[derive(Debug, PartialEq)]
+pub struct ExtractedTimestamps {
+    processing_type: ProcessingType,
+    start_timestamp: i64,
+    end_timestamp: i64,
 }
 
 pub fn any_key_to_continue(text: &str) {
@@ -132,7 +139,10 @@ fn process_url(url: &str) -> Result<Html> {
     Ok(Html::parse_document(&body))
 }
 
-pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
+pub fn derive_date_from_url(
+    url: &str,
+    processing_type: Option<ProcessingType>,
+) -> Result<(ProcessingType, URLData)> {
     match Url::parse(url) {
         Ok(resolved_url) => match resolved_url.domain() {
             Some(domain) => match domain.to_lowercase().as_str() {
@@ -205,47 +215,32 @@ pub fn derive_date_from_url(url: &str) -> Result<(ProcessingType, URLData)> {
                                 Ok(f) => f,
                                 Err(e) => Err(e)?,
                             };
-                            let selector = match Selector::parse("div > div[data-requests]") {
-                                Ok(s) => s,
-                                Err(_) => Err(DeriveDateError::SelectorError)?,
-                            };
 
-                            let clips_json = match fragment
-                                .select(&selector)
-                                .nth(0)
-                                .ok_or(DeriveDateError::ScraperElementError)
-                            {
-                                Ok(d) => {
-                                    match d
-                                        .value()
-                                        .attr("data-requests")
-                                        .ok_or(DeriveDateError::ScraperAttributeError)
-                                    {
-                                        Ok(s) => s.to_string(),
-                                        Err(e) => return Err(e)?,
-                                    }
+                            let extracted_results: ExtractedTimestamps = match processing_type {
+                                Some(ProcessingType::Bruteforce) => {
+                                    info!("Bruteforcing for timestamps...");
+                                    sc_bruteforce_timestamps(&fragment)?
                                 }
-                                Err(e) => return Err(e)?,
-                            };
-
-                            // Parse the clips_json into the struct StreamsChartsTwitchClips with serde_json
-                            let clips_payloads: Vec<StreamsChartsTwitchClip> = serde_json::from_str(&clips_json).unwrap();
-                            let start_dt_parsed = match parse_timestamp(&clips_payloads.first().unwrap().started_at) {
-                                Ok(d) => d,
-                                Err(e) => return Err(e)?,
-                            };
-                            let end_dt_parsed = match parse_timestamp(&clips_payloads.last().unwrap().ended_at) {
-                                Ok(d) => d,
-                                Err(e) => return Err(e)?,
-                            };
+                                Some(ProcessingType::Exact) => {
+                                    info!("Extracting exact timestamps...");
+                                    sc_extract_exact_timestamps(&fragment)?
+                                }
+                                None => {
+                                    info!("Extracting exact timestamps...");
+                                    sc_extract_exact_timestamps(&fragment).or_else(|_| {
+                                        info!("Bruteforcing for timestamps...");
+                                        sc_bruteforce_timestamps(&fragment)
+                                    })?
+                                }
+                                };
 
                             return Ok((
-                                ProcessingType::Exact,
+                                extracted_results.processing_type,
                                 URLData {
                                     username: username.to_string(),
                                     broadcast_id: broadcast_id.to_string(),
-                                    start_date: start_dt_parsed.to_string(),
-                                    end_date: Some(end_dt_parsed.to_string()),
+                                    start_date: extracted_results.start_timestamp.to_string(),
+                                    end_date: Some(extracted_results.end_timestamp.to_string()),
                                 },
                             ));
                         } else {
@@ -445,6 +440,86 @@ pub fn compile_cdn_list(cdn_file_path: Option<String>) -> Vec<String> {
     return_vec
 }
 
+fn sc_extract_exact_timestamps(html_fragment: &Html) -> Result<ExtractedTimestamps> {
+    let exact_dt_selector = match Selector::parse("div > div[data-requests]") {
+        Ok(s) => s,
+        Err(_) => Err(DeriveDateError::SelectorError)?,
+    };
+
+    match html_fragment
+        .select(&exact_dt_selector)
+        .nth(0)
+        .ok_or(DeriveDateError::ScraperElementError)
+    {
+        Ok(d) => {
+            match d
+                .value()
+                .attr("data-requests")
+                .ok_or(DeriveDateError::ScraperAttributeError)
+            {
+                Ok(s) => {
+                    // Parse the clips_json into the struct StreamsChartsTwitchClip with serde_json
+                    let clips_payloads: Vec<StreamsChartsTwitchClip> =
+                        serde_json::from_str(&s.to_string()).unwrap();
+                    let start_dt =
+                        match parse_timestamp(&clips_payloads.first().unwrap().started_at) {
+                            Ok(dt) => dt,
+                            Err(e) => return Err(e)?,
+                        };
+                    let end_dt = match parse_timestamp(&clips_payloads.last().unwrap().ended_at) {
+                        Ok(dt) => dt,
+                        Err(e) => return Err(e)?,
+                    };
+                    info!(
+                        "Found exact timestamps for the stream. Started at {} and ended at {}.",
+                        start_dt, end_dt
+                    );
+                    return Ok(ExtractedTimestamps {
+                        processing_type: ProcessingType::Exact,
+                        start_timestamp: start_dt,
+                        end_timestamp: end_dt,
+                    });
+                }
+                Err(e) => return Err(e)?,
+            }
+        }
+        Err(e) => return Err(e)?,
+    };
+}
+
+fn sc_bruteforce_timestamps(html_fragment: &Html) -> Result<ExtractedTimestamps> {
+    let bruteforce_selector = match Selector::parse("time") {
+        Ok(s) => s,
+        Err(_) => Err(DeriveDateError::SelectorError)?,
+    };
+    let date_init = match html_fragment
+        .select(&bruteforce_selector)
+        .nth(0)
+        .ok_or(DeriveDateError::ScraperElementError)
+    {
+        Ok(d) => {
+            match d
+                .value()
+                .attr("datetime")
+                .ok_or(DeriveDateError::ScraperAttributeError)
+            {
+                Ok(s) => s.to_string(),
+                Err(e) => return Err(e)?,
+            }
+        }
+        Err(e) => return Err(e)?,
+    };
+    let date_parsed = match parse_timestamp(&date_init) {
+        Ok(d) => d,
+        Err(e) => return Err(e)?,
+    };
+    return Ok(ExtractedTimestamps {
+        processing_type: ProcessingType::Bruteforce,
+        start_timestamp: date_parsed - 60,
+        end_timestamp: date_parsed + 60,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -570,7 +645,7 @@ mod tests {
     #[test]
     fn derive_date() {
         assert_eq!(
-            derive_date_from_url("https://twitchtracker.com/forsen/streams/39619965384").unwrap(),
+            derive_date_from_url("https://twitchtracker.com/forsen/streams/39619965384", None).unwrap(),
             (
                 ProcessingType::Exact,
                 URLData {
@@ -584,7 +659,22 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384")
+            derive_date_from_url("https://streamscharts.com/channels/robcdee/streams/39648192487", None)
+                .unwrap(),
+            (
+                ProcessingType::Exact,
+                URLData {
+                    username: "robcdee".to_string(),
+                    broadcast_id: "39648192487".to_string(),
+                    start_date: "1662523601".to_string(),
+                    end_date: Some("1662540600".to_string())
+                }
+            ),
+            "testing streamscharts (exact) - https://streamscharts.com/channels/robcdee/streams/39648192487"
+        );
+
+        assert_eq!(
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Some(ProcessingType::Exact))
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -595,16 +685,31 @@ mod tests {
                     end_date: Some("1657666800".to_string())
                 }
             ),
-            "testing streamscharts - https://streamscharts.com/channels/forsen/streams/39619965384"
+            "testing streamscharts (exact) - https://streamscharts.com/channels/forsen/streams/39619965384"
+        );
+
+        assert_eq!(
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Some(ProcessingType::Bruteforce))
+                .unwrap(),
+            (
+                ProcessingType::Bruteforce,
+                URLData {
+                    username: "forsen".to_string(),
+                    broadcast_id: "39619965384".to_string(),
+                    start_date: "1657645440".to_string(),
+                    end_date: Some("1657645560".to_string())
+                }
+            ),
+            "testing streamscharts (bruteforce) - https://streamscharts.com/channels/forsen/streams/39619965384"
         );
 
         assert!(
-            derive_date_from_url("https://google.com").is_err(),
+            derive_date_from_url("https://google.com", None).is_err(),
             "testing wrong link - https://google.com"
         );
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384").is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384").is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384").is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384").is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384", None).is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", None).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", None).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", None).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
     }
 }
