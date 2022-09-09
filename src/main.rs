@@ -69,6 +69,7 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: None,
             };
 
             let valid_urls = match exact(
@@ -147,6 +148,7 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: None,
             };
 
             let valid_urls = match bruteforcer(
@@ -203,19 +205,20 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let (proc, data) = match derive_date_from_url(&url, None) {
-                Ok(a) => a,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
             let fl = Flags {
                 verbose: false,
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: matches.brutefoce,
+            };
+
+            let (proc, data) = match derive_date_from_url(&url, fl.clone()) {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
             };
 
             let valid_urls = match proc {
@@ -313,6 +316,7 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: None,
             };
 
             let valid_urls = match live(username.as_str(), fl.clone()) {
@@ -362,13 +366,14 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: None,
             };
 
             match find_bid_from_clip(clip, fl.clone()) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url, None) {
+                        let (_, data) = match derive_date_from_url(&url, fl.clone()) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);
@@ -473,6 +478,7 @@ fn interface(matches: Cli) {
                     simple: false,
                     pbar: true,
                     cdnfile: matches.cdnfile,
+                    bruteforce: None,
                 },
             );
 
@@ -490,6 +496,7 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
+                bruteforce: None,
             };
 
             match fix(url.as_str(), None, false, fl) {
@@ -558,6 +565,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
+                bruteforce: matches.brutefoce,
             };
 
             match bruteforcer(username, id, initial_from_stamp, initial_to_stamp, flags) {
@@ -586,6 +594,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
+                    bruteforce: matches.brutefoce,
                 },
             ) {
                 Ok(_) => {}
@@ -608,6 +617,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
+                    bruteforce: matches.brutefoce,
                 },
             ) {
                 Ok(_) => {}
@@ -618,20 +628,21 @@ fn main() {
             };
         }
         Some(Commands::Link { progressbar, url }) => {
-            let url = url.as_str();
-            let (proc, data) = match derive_date_from_url(&url, None) {
-                Ok(a) => a,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
             let fl = Flags {
                 verbose: matches.verbose,
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
+                bruteforce: matches.brutefoce,
+            };
+
+            let url = url.as_str();
+            let (proc, data) = match derive_date_from_url(&url, fl.clone()) {
+                Ok(a) => a,
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
             };
 
             match proc {
@@ -697,13 +708,14 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
+                bruteforce: matches.brutefoce,
             };
 
             match find_bid_from_clip(clip, fl.clone()) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url, None) {
+                        let (_, data) = match derive_date_from_url(&url, fl.clone()) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);
@@ -742,6 +754,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
+                    bruteforce: matches.brutefoce,
                 },
             );
         }
@@ -759,6 +772,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
+                bruteforce: matches.brutefoce,
             },
         ) {
             Ok(_) => {}

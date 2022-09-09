@@ -23,6 +23,7 @@ use time::{
 use url::Url;
 
 use super::config::CURL_UA;
+use crate::config::Flags;
 use crate::error::DeriveDateError;
 use crate::twitch::models::CDN_URLS;
 
@@ -139,10 +140,7 @@ fn process_url(url: &str) -> Result<Html> {
     Ok(Html::parse_document(&body))
 }
 
-pub fn derive_date_from_url(
-    url: &str,
-    processing_type: Option<ProcessingType>,
-) -> Result<(ProcessingType, URLData)> {
+pub fn derive_date_from_url(url: &str, flags: Flags) -> Result<(ProcessingType, URLData)> {
     match Url::parse(url) {
         Ok(resolved_url) => match resolved_url.domain() {
             Some(domain) => match domain.to_lowercase().as_str() {
@@ -215,24 +213,43 @@ pub fn derive_date_from_url(
                                 Ok(f) => f,
                                 Err(e) => Err(e)?,
                             };
-
-                            let extracted_results: ExtractedTimestamps = match processing_type {
-                                Some(ProcessingType::Bruteforce) => {
-                                    info!("Bruteforcing for timestamps...");
+                            info!("Value: {}", flags.simple);
+                            let extracted_results: ExtractedTimestamps = match flags.bruteforce {
+                                Some(true) => {
+                                    if !flags.simple {
+                                        info!("Bruteforcing for timestamps...");
+                                    }
                                     sc_bruteforce_timestamps(&fragment)?
                                 }
-                                Some(ProcessingType::Exact) => {
-                                    info!("Extracting exact timestamps...");
+                                Some(false) => {
+                                    if !flags.simple {
+                                        info!("Extracting exact timestamps...");
+                                    }
                                     sc_extract_exact_timestamps(&fragment)?
                                 }
                                 None => {
-                                    info!("Extracting exact timestamps...");
+                                    if !flags.simple {
+                                        info!("Extracting exact timestamps...");
+                                    }
                                     sc_extract_exact_timestamps(&fragment).or_else(|_| {
-                                        info!("Bruteforcing for timestamps...");
+                                        if !flags.simple {
+                                            info!("Bruteforcing for timestamps...");
+                                        }
                                         sc_bruteforce_timestamps(&fragment)
                                     })?
                                 }
+                            };
+
+                            if !flags.simple {
+                                let approximate_or_exact = match extracted_results.processing_type {
+                                    ProcessingType::Exact => "exact",
+                                    ProcessingType::Bruteforce => "approximate",
                                 };
+                                info!(
+                                    "Found {} timestamps for the stream. Started at {} and ended at {}.",
+                                    approximate_or_exact, extracted_results.start_timestamp, extracted_results.end_timestamp
+                                );
+                            }
 
                             return Ok((
                                 extracted_results.processing_type,
@@ -460,7 +477,7 @@ fn sc_extract_exact_timestamps(html_fragment: &Html) -> Result<ExtractedTimestam
                 Ok(s) => {
                     // Parse the clips_json into the struct StreamsChartsTwitchClip with serde_json
                     let clips_payloads: Vec<StreamsChartsTwitchClip> =
-                        serde_json::from_str(&s.to_string()).unwrap();
+                        serde_json::from_str(s).unwrap();
                     let start_dt =
                         match parse_timestamp(&clips_payloads.first().unwrap().started_at) {
                             Ok(dt) => dt,
@@ -470,10 +487,7 @@ fn sc_extract_exact_timestamps(html_fragment: &Html) -> Result<ExtractedTimestam
                         Ok(dt) => dt,
                         Err(e) => return Err(e)?,
                     };
-                    info!(
-                        "Found exact timestamps for the stream. Started at {} and ended at {}.",
-                        start_dt, end_dt
-                    );
+
                     return Ok(ExtractedTimestamps {
                         processing_type: ProcessingType::Exact,
                         start_timestamp: start_dt,
@@ -503,13 +517,13 @@ fn sc_bruteforce_timestamps(html_fragment: &Html) -> Result<ExtractedTimestamps>
                 .attr("datetime")
                 .ok_or(DeriveDateError::ScraperAttributeError)
             {
-                Ok(s) => s.to_string(),
+                Ok(s) => s,
                 Err(e) => return Err(e)?,
             }
         }
         Err(e) => return Err(e)?,
     };
-    let date_parsed = match parse_timestamp(&date_init) {
+    let date_parsed = match parse_timestamp(date_init) {
         Ok(d) => d,
         Err(e) => return Err(e)?,
     };
@@ -517,7 +531,7 @@ fn sc_bruteforce_timestamps(html_fragment: &Html) -> Result<ExtractedTimestamps>
         processing_type: ProcessingType::Bruteforce,
         start_timestamp: date_parsed - 60,
         end_timestamp: date_parsed + 60,
-    })
+    });
 }
 
 #[cfg(test)]
@@ -526,6 +540,7 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
+    use crate::config::Flags;
     use crate::twitch::models::CDN_URLS;
 
     use super::{compile_cdn_list, derive_date_from_url, parse_timestamp, ProcessingType, URLData};
@@ -645,7 +660,11 @@ mod tests {
     #[test]
     fn derive_date() {
         assert_eq!(
-            derive_date_from_url("https://twitchtracker.com/forsen/streams/39619965384", None).unwrap(),
+            derive_date_from_url(
+                "https://twitchtracker.com/forsen/streams/39619965384",
+                Flags::default()
+            )
+            .unwrap(),
             (
                 ProcessingType::Exact,
                 URLData {
@@ -659,7 +678,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/robcdee/streams/39648192487", None)
+            derive_date_from_url("https://streamscharts.com/channels/robcdee/streams/39648192487", Flags::default())
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -670,11 +689,11 @@ mod tests {
                     end_date: Some("1662540600".to_string())
                 }
             ),
-            "testing streamscharts (exact) - https://streamscharts.com/channels/robcdee/streams/39648192487"
+            "testing streamscharts (exact with brutefoce fallback) - https://streamscharts.com/channels/robcdee/streams/39648192487"
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Some(ProcessingType::Exact))
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Flags {bruteforce: Some(false), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -689,7 +708,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Some(ProcessingType::Bruteforce))
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Flags {bruteforce: Some(true), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Bruteforce,
@@ -704,12 +723,12 @@ mod tests {
         );
 
         assert!(
-            derive_date_from_url("https://google.com", None).is_err(),
+            derive_date_from_url("https://google.com", Flags::default()).is_err(),
             "testing wrong link - https://google.com"
         );
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384", None).is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", None).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", None).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", None).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384", Flags::default()).is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", Flags::default()).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", Flags::default()).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", Flags::default()).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
     }
 }
