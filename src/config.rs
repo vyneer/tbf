@@ -8,6 +8,7 @@ pub struct Flags {
     pub simple: bool,
     pub pbar: bool,
     pub cdnfile: Option<String>,
+    pub bruteforce: Option<bool>,
 }
 
 impl Default for Flags {
@@ -17,6 +18,7 @@ impl Default for Flags {
             simple: false,
             pbar: false,
             cdnfile: None,
+            bruteforce: None,
         }
     }
 }
@@ -38,6 +40,10 @@ pub struct Cli {
 
     #[clap(subcommand)]
     pub command: Option<Commands>,
+
+    /// Explicitly use bruteforce mode for StreamsCharts 
+    #[clap(short, long)]
+    pub bruteforce: Option<bool>,
 }
 
 #[derive(Subcommand)]
