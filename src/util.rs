@@ -213,7 +213,7 @@ pub fn derive_date_from_url(url: &str, flags: Flags) -> Result<(ProcessingType, 
                                 Ok(f) => f,
                                 Err(e) => Err(e)?,
                             };
-                            info!("Value: {}", flags.simple);
+
                             let extracted_results: ExtractedTimestamps = match flags.bruteforce {
                                 Some(true) => {
                                     if !flags.simple {
@@ -689,7 +689,7 @@ mod tests {
                     end_date: Some("1662540600".to_string())
                 }
             ),
-            "testing streamscharts (exact with brutefoce fallback) - https://streamscharts.com/channels/robcdee/streams/39648192487"
+            "testing streamscharts (exact with bruteforce fallback) - https://streamscharts.com/channels/robcdee/streams/39648192487"
         );
 
         assert_eq!(

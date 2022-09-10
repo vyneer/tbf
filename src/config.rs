@@ -43,7 +43,7 @@ pub struct Cli {
 
     /// Explicitly use bruteforce mode for StreamsCharts 
     #[clap(short, long)]
-    pub brutefoce: Option<bool>,
+    pub bruteforce: Option<bool>,
 }
 
 #[derive(Subcommand)]

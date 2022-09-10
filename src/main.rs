@@ -210,7 +210,7 @@ fn interface(matches: Cli) {
                 simple: false,
                 pbar: true,
                 cdnfile: matches.cdnfile,
-                bruteforce: matches.brutefoce,
+                bruteforce: matches.bruteforce,
             };
 
             let (proc, data) = match derive_date_from_url(&url, fl.clone()) {
@@ -565,7 +565,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
-                bruteforce: matches.brutefoce,
+                bruteforce: matches.bruteforce,
             };
 
             match bruteforcer(username, id, initial_from_stamp, initial_to_stamp, flags) {
@@ -594,7 +594,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
-                    bruteforce: matches.brutefoce,
+                    bruteforce: matches.bruteforce,
                 },
             ) {
                 Ok(_) => {}
@@ -617,7 +617,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
-                    bruteforce: matches.brutefoce,
+                    bruteforce: matches.bruteforce,
                 },
             ) {
                 Ok(_) => {}
@@ -633,7 +633,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
-                bruteforce: matches.brutefoce,
+                bruteforce: matches.bruteforce,
             };
 
             let url = url.as_str();
@@ -708,7 +708,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
-                bruteforce: matches.brutefoce,
+                bruteforce: matches.bruteforce,
             };
 
             match find_bid_from_clip(clip, fl.clone()) {
@@ -754,7 +754,7 @@ fn main() {
                     simple: matches.simple,
                     pbar: progressbar,
                     cdnfile: matches.cdnfile,
-                    bruteforce: matches.brutefoce,
+                    bruteforce: matches.bruteforce,
                 },
             );
         }
@@ -772,7 +772,7 @@ fn main() {
                 simple: matches.simple,
                 pbar: progressbar,
                 cdnfile: matches.cdnfile,
-                bruteforce: matches.brutefoce,
+                bruteforce: matches.bruteforce,
             },
         ) {
             Ok(_) => {}
