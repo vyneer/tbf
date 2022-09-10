@@ -7,7 +7,7 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::{collections::HashMap, str::FromStr};
 use url::Url;
 
-use crate::config::Flags;
+use crate::config::Cli;
 use crate::error::ClipError;
 use crate::twitch::models;
 use crate::util::info;
@@ -62,7 +62,7 @@ fn extract_slug(s: String) -> Result<Option<String>> {
     }
 }
 
-pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64)>> {
+pub fn find_bid_from_clip(s: String, flags: Cli) -> Result<Option<(String, i64)>> {
     let slug = match extract_slug(s) {
         Ok(s) => match s {
             Some(s) => s,
@@ -121,7 +121,7 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
     )))
 }
 
-pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
+pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Cli) {
     let vod = vod.to_string();
     let pb = ProgressBar::new((end - start) as u64);
     let cloned_pb = pb.clone();
@@ -130,7 +130,7 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
     let iter_pb = (start..end).into_par_iter().progress_with(pb);
     let res: Vec<String>;
 
-    if flags.pbar {
+    if flags.progressbar {
         res = iter_pb.filter_map( |number| {
             let url = format!("https://clips-media-assets2.twitch.tv/AT-cm%7C{}-offset-{}-360.mp4", vod, number);
             let res = match crate::HTTP_CLIENT.get(url.as_str()).send() {
@@ -192,7 +192,7 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Flags;
+    use crate::config::Cli;
 
     use super::{extract_slug as es, find_bid_from_clip as bid};
 
@@ -233,7 +233,7 @@ mod tests {
         assert_eq!(
             bid(
                 "SpotlessCrypticStapleAMPTropPunch-H_rVu0mGfGLNMlEx".to_string(),
-                Flags::default()
+                Cli::default()
             )
             .unwrap(),
             Some(("mrmouton".to_string(), 39905263305)),
@@ -242,7 +242,7 @@ mod tests {
         assert_eq!(
             bid(
                 "SpotlessCrypticStapleAMPTropPunch-H_rVu0mfGLNMlEx".to_string(),
-                Flags::default()
+                Cli::default()
             )
             .unwrap(),
             None,

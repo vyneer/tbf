@@ -13,7 +13,7 @@ use std::{
     panic,
 };
 
-use config::{Cli, Commands, Flags};
+use config::{Cli, Commands};
 use twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
     vods::{bruteforcer, exact, fix, live},
@@ -64,14 +64,6 @@ fn interface(matches: Cli) {
                 .expect("Failed to read line.");
             trim_newline(&mut initial_stamp);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: None,
-            };
-
             let valid_urls = match exact(
                 username.as_str(),
                 match vod.parse::<i64>() {
@@ -82,7 +74,7 @@ fn interface(matches: Cli) {
                     }
                 },
                 initial_stamp.as_str(),
-                fl.clone(),
+                matches.clone(),
             ) {
                 Ok(u) => match u {
                     Some(u) => u,
@@ -104,13 +96,15 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
+                        "y" | "" => {
+                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -143,14 +137,6 @@ fn interface(matches: Cli) {
                 .expect("Failed to read line.");
             trim_newline(&mut initial_to_stamp);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: None,
-            };
-
             let valid_urls = match bruteforcer(
                 username.as_str(),
                 match vod.parse::<i64>() {
@@ -162,7 +148,7 @@ fn interface(matches: Cli) {
                 },
                 initial_from_stamp.as_str(),
                 initial_to_stamp.as_str(),
-                fl.clone(),
+                matches.clone(),
             ) {
                 Ok(u) => match u {
                     Some(u) => u,
@@ -184,13 +170,15 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
+                        "y" | "" => {
+                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -205,15 +193,7 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: matches.bruteforce,
-            };
-
-            let (proc, data) = match derive_date_from_url(&url, fl.clone()) {
+            let (proc, data) = match derive_date_from_url(&url, matches.clone()) {
                 Ok(a) => a,
                 Err(e) => {
                     error!("{}", e);
@@ -233,7 +213,7 @@ fn interface(matches: Cli) {
                             }
                         },
                         data.start_date.as_str(),
-                        fl.clone(),
+                        matches.clone(),
                     ) {
                         Ok(u) => match u {
                             Some(u) => u,
@@ -264,7 +244,7 @@ fn interface(matches: Cli) {
                         },
                         data.start_date.as_str(),
                         end_date.as_str(),
-                        fl.clone(),
+                        matches.clone(),
                     ) {
                         Ok(u) => match u {
                             Some(u) => u,
@@ -288,13 +268,15 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
+                        "y" | "" => {
+                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -311,15 +293,7 @@ fn interface(matches: Cli) {
                 .expect("Failed to read line.");
             trim_newline(&mut username);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: None,
-            };
-
-            let valid_urls = match live(username.as_str(), fl.clone()) {
+            let valid_urls = match live(username.as_str(), matches.clone()) {
                 Ok(u) => match u {
                     Some(u) => u,
                     None => Vec::new(),
@@ -340,13 +314,15 @@ fn interface(matches: Cli) {
                     trim_newline(&mut response);
 
                     match response.to_lowercase().as_str() {
-                        "y" | "" => match fix(valid_urls[0].playlist.as_str(), None, false, fl) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
+                        "y" | "" => {
+                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -361,19 +337,11 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut clip).expect("Failed to read line.");
             trim_newline(&mut clip);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: None,
-            };
-
-            match find_bid_from_clip(clip, fl.clone()) {
+            match find_bid_from_clip(clip, matches.clone()) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url, fl.clone()) {
+                        let (_, data) = match derive_date_from_url(&url, matches.clone()) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);
@@ -385,7 +353,7 @@ fn interface(matches: Cli) {
                             username.as_str(),
                             vod,
                             data.start_date.as_str(),
-                            fl.clone(),
+                            matches.clone(),
                         ) {
                             Ok(u) => match u {
                                 Some(u) => u,
@@ -408,8 +376,12 @@ fn interface(matches: Cli) {
 
                                 match response.to_lowercase().as_str() {
                                     "y" | "" => {
-                                        match fix(valid_urls[0].playlist.as_str(), None, false, fl)
-                                        {
+                                        match fix(
+                                            valid_urls[0].playlist.as_str(),
+                                            None,
+                                            false,
+                                            matches,
+                                        ) {
                                             Ok(_) => {}
                                             Err(e) => {
                                                 error!("{}", e);
@@ -469,18 +441,7 @@ fn interface(matches: Cli) {
                 }
             };
 
-            clip_bruteforce(
-                vod,
-                start,
-                end,
-                Flags {
-                    verbose: false,
-                    simple: false,
-                    pbar: true,
-                    cdnfile: matches.cdnfile,
-                    bruteforce: None,
-                },
-            );
+            clip_bruteforce(vod, start, end, matches);
 
             return;
         }
@@ -491,15 +452,7 @@ fn interface(matches: Cli) {
             stdin().read_line(&mut url).expect("Failed to read line.");
             trim_newline(&mut url);
 
-            let fl = Flags {
-                verbose: false,
-                simple: false,
-                pbar: true,
-                cdnfile: matches.cdnfile,
-                bruteforce: None,
-            };
-
-            match fix(url.as_str(), None, false, fl) {
+            match fix(url.as_str(), None, false, matches) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("{}", e);
@@ -550,7 +503,6 @@ fn main() {
 
     match matches.command {
         Some(Commands::Bruteforce {
-            progressbar,
             username,
             id,
             from,
@@ -560,15 +512,12 @@ fn main() {
             let initial_from_stamp = from.as_str();
             let initial_to_stamp = to.as_str();
 
-            let flags = Flags {
-                verbose: matches.verbose,
-                simple: matches.simple,
-                pbar: progressbar,
-                cdnfile: matches.cdnfile,
-                bruteforce: matches.bruteforce,
+            let matches = Cli {
+                command: None,
+                ..matches
             };
 
-            match bruteforcer(username, id, initial_from_stamp, initial_to_stamp, flags) {
+            match bruteforcer(username, id, initial_from_stamp, initial_to_stamp, matches) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("{}", e);
@@ -577,7 +526,6 @@ fn main() {
             };
         }
         Some(Commands::Exact {
-            progressbar,
             username,
             id,
             stamp,
@@ -585,18 +533,12 @@ fn main() {
             let username = username.as_str();
             let initial_stamp = stamp.as_str();
 
-            match exact(
-                username,
-                id,
-                initial_stamp,
-                Flags {
-                    verbose: matches.verbose,
-                    simple: matches.simple,
-                    pbar: progressbar,
-                    cdnfile: matches.cdnfile,
-                    bruteforce: matches.bruteforce,
-                },
-            ) {
+            let matches = Cli {
+                command: None,
+                ..matches
+            };
+
+            match exact(username, id, initial_stamp, matches) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("{}", e);
@@ -604,22 +546,15 @@ fn main() {
                 }
             };
         }
-        Some(Commands::Live {
-            progressbar,
-            username,
-        }) => {
+        Some(Commands::Live { username }) => {
             let username = username.as_str();
 
-            match live(
-                username,
-                Flags {
-                    verbose: matches.verbose,
-                    simple: matches.simple,
-                    pbar: progressbar,
-                    cdnfile: matches.cdnfile,
-                    bruteforce: matches.bruteforce,
-                },
-            ) {
+            let matches = Cli {
+                command: None,
+                ..matches
+            };
+
+            match live(username, matches) {
                 Ok(_) => {}
                 Err(e) => {
                     error!("{}", e);
@@ -627,17 +562,15 @@ fn main() {
                 }
             };
         }
-        Some(Commands::Link { progressbar, url }) => {
-            let fl = Flags {
-                verbose: matches.verbose,
-                simple: matches.simple,
-                pbar: progressbar,
-                cdnfile: matches.cdnfile,
-                bruteforce: matches.bruteforce,
+        Some(Commands::Link { url }) => {
+            let url = url.as_str();
+
+            let matches = Cli {
+                command: None,
+                ..matches
             };
 
-            let url = url.as_str();
-            let (proc, data) = match derive_date_from_url(&url, fl.clone()) {
+            let (proc, data) = match derive_date_from_url(&url, matches.clone()) {
                 Ok(a) => a,
                 Err(e) => {
                     error!("{}", e);
@@ -657,7 +590,7 @@ fn main() {
                             }
                         },
                         data.start_date.as_str(),
-                        fl.clone(),
+                        matches.clone(),
                     ) {
                         Ok(u) => match u {
                             Some(u) => u,
@@ -688,7 +621,7 @@ fn main() {
                         },
                         data.start_date.as_str(),
                         end_date.as_str(),
-                        fl.clone(),
+                        matches.clone(),
                     ) {
                         Ok(u) => match u {
                             Some(u) => u,
@@ -702,20 +635,17 @@ fn main() {
                 }
             };
         }
-        Some(Commands::Clip { progressbar, clip }) => {
-            let fl = Flags {
-                verbose: matches.verbose,
-                simple: matches.simple,
-                pbar: progressbar,
-                cdnfile: matches.cdnfile,
-                bruteforce: matches.bruteforce,
+        Some(Commands::Clip { clip }) => {
+            let matches = Cli {
+                command: None,
+                ..matches
             };
 
-            match find_bid_from_clip(clip, fl.clone()) {
+            match find_bid_from_clip(clip, matches.clone()) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url, fl.clone()) {
+                        let (_, data) = match derive_date_from_url(&url, matches.clone()) {
                             Ok(a) => a,
                             Err(e) => {
                                 error!("{}", e);
@@ -723,7 +653,7 @@ fn main() {
                             }
                         };
 
-                        match exact(&username, vod, &data.start_date, fl) {
+                        match exact(&username, vod, &data.start_date, matches) {
                             Ok(_) => {}
                             Err(e) => {
                                 error!("{}", e);
@@ -739,48 +669,23 @@ fn main() {
                 }
             }
         }
-        Some(Commands::Clipforce {
-            progressbar,
-            id,
-            start,
-            end,
-        }) => {
-            clip_bruteforce(
-                id,
-                start,
-                end,
-                Flags {
-                    verbose: matches.verbose,
-                    simple: matches.simple,
-                    pbar: progressbar,
-                    cdnfile: matches.cdnfile,
-                    bruteforce: matches.bruteforce,
-                },
-            );
+        Some(Commands::Clipforce { id, start, end }) => {
+            clip_bruteforce(id, start, end, matches);
         }
-        Some(Commands::Fix {
-            url,
-            output,
-            slow,
-            progressbar,
-        }) => match fix(
-            url.as_str(),
-            output,
-            slow,
-            Flags {
-                verbose: matches.verbose,
-                simple: matches.simple,
-                pbar: progressbar,
-                cdnfile: matches.cdnfile,
-                bruteforce: matches.bruteforce,
-            },
-        ) {
-            Ok(_) => {}
-            Err(e) => {
-                error!("{}", e);
-                return;
+        Some(Commands::Fix { url, output, slow }) => {
+            let matches = Cli {
+                command: None,
+                ..matches
+            };
+
+            match fix(url.as_str(), output, slow, matches) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("{}", e);
+                    return;
+                }
             }
-        },
+        }
         _ => interface(matches),
     }
 }

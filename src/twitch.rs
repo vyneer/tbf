@@ -5,7 +5,7 @@ pub mod vods;
 use indicatif::{ParallelProgressIterator, ProgressBar};
 use rayon::prelude::*;
 
-use crate::config::Flags;
+use crate::config::Cli;
 use crate::util::compile_cdn_list;
 use models::{AvailabilityCheck, ReturnURL};
 
@@ -14,7 +14,7 @@ pub fn check_availability(
     username: &str,
     broadcast_id: i64,
     timestamp: &i64,
-    flags: Flags,
+    flags: Cli,
 ) -> Vec<ReturnURL> {
     let mut urls: Vec<AvailabilityCheck> = Vec::new();
     let valid_urls: Vec<ReturnURL>;
@@ -52,7 +52,7 @@ pub fn check_availability(
     let urls_iter = urls.par_iter();
     let urls_iter_pb = urls.par_iter().progress_with(pb);
 
-    match flags.pbar {
+    match flags.progressbar {
         false => {
             valid_urls = urls_iter
                 .filter_map(|url| {
@@ -114,7 +114,7 @@ pub fn check_availability(
 
 #[cfg(test)]
 mod tests {
-    use crate::{config::Flags, twitch::models::ReturnURL};
+    use crate::{config::Cli, twitch::models::ReturnURL};
 
     use super::check_availability as ca;
 
@@ -126,7 +126,7 @@ mod tests {
             "dansgaming",
             42218705421,
             &1622854217,
-            Flags::default(),
+            Cli::default(),
         );
 
         let comp_working: Vec<ReturnURL> = vec![ReturnURL {
@@ -148,7 +148,7 @@ mod tests {
             "forsen",
             23722143840,
             &1479745189,
-            Flags::default(),
+            Cli::default(),
         );
 
         let comp_not_working: Vec<ReturnURL> = vec![];

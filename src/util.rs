@@ -23,7 +23,7 @@ use time::{
 use url::Url;
 
 use super::config::CURL_UA;
-use crate::config::Flags;
+use crate::config::Cli;
 use crate::error::DeriveDateError;
 use crate::twitch::models::CDN_URLS;
 
@@ -140,7 +140,7 @@ fn process_url(url: &str) -> Result<Html> {
     Ok(Html::parse_document(&body))
 }
 
-pub fn derive_date_from_url(url: &str, flags: Flags) -> Result<(ProcessingType, URLData)> {
+pub fn derive_date_from_url(url: &str, flags: Cli) -> Result<(ProcessingType, URLData)> {
     match Url::parse(url) {
         Ok(resolved_url) => match resolved_url.domain() {
             Some(domain) => match domain.to_lowercase().as_str() {
@@ -540,7 +540,7 @@ mod tests {
     use std::io::Write;
     use tempfile::tempdir;
 
-    use crate::config::Flags;
+    use crate::config::Cli;
     use crate::twitch::models::CDN_URLS;
 
     use super::{compile_cdn_list, derive_date_from_url, parse_timestamp, ProcessingType, URLData};
@@ -662,7 +662,7 @@ mod tests {
         assert_eq!(
             derive_date_from_url(
                 "https://twitchtracker.com/forsen/streams/39619965384",
-                Flags::default()
+                Cli::default()
             )
             .unwrap(),
             (
@@ -678,7 +678,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/robcdee/streams/39648192487", Flags::default())
+            derive_date_from_url("https://streamscharts.com/channels/robcdee/streams/39648192487", Cli::default())
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -693,7 +693,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Flags {bruteforce: Some(false), ..Default::default()})
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {bruteforce: Some(false), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -708,7 +708,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Flags {bruteforce: Some(true), ..Default::default()})
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {bruteforce: Some(true), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Bruteforce,
@@ -723,12 +723,12 @@ mod tests {
         );
 
         assert!(
-            derive_date_from_url("https://google.com", Flags::default()).is_err(),
+            derive_date_from_url("https://google.com", Cli::default()).is_err(),
             "testing wrong link - https://google.com"
         );
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384", Flags::default()).is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", Flags::default()).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
-        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", Flags::default()).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
-        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", Flags::default()).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/streams/3961965384", Cli::default()).is_err(), "testing wrong twitchtracker link 1 - https://twitchtracker.com/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", Cli::default()).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
+        assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", Cli::default()).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
+        assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", Cli::default()).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
     }
 }
