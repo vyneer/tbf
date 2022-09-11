@@ -12,6 +12,7 @@ use std::{
     io::{stdin, stdout},
     panic,
 };
+use strum::{EnumMessage, IntoEnumIterator};
 
 use config::{Cli, Commands};
 use twitch::{
@@ -25,333 +26,206 @@ lazy_static! {
     static ref HTTP_CLIENT: reqwest::blocking::Client = reqwest::blocking::Client::new();
 }
 
-fn interface(matches: Cli) {
+fn interface(mut matches: Cli) {
+    // forcing the progress bar option on
+    matches = Cli {
+        progressbar: true,
+        ..matches
+    };
+
     let mut mode = String::new();
 
-    println!("Please select the mode you want:");
-    println!("[1] Exact mode - Combine all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL and check whether the VOD is available");
-    println!("[2] Bruteforce mode - Go over a range of timestamps, looking for a usable/working m3u8 URL, and check whether the VOD is available");
-    println!("[3] Link mode - Get the m3u8 from a TwitchTracker/StreamsCharts URL");
-    println!("[4] Live mode - Get the m3u8 from a currently running stream");
-    println!("[5] Clip mode - Get the m3u8 from a clip using TwitchTracker");
-    println!(
-        "[6] Clip bruteforce mode - Go over a range of timestamps, looking for clips in a VOD"
-    );
-    println!(
-        "[7] Fix playlist - Download and convert an unplayable unmuted Twitch VOD playlist into a playable muted one"
-    );
+    println!("Select the application mode:");
+    for (i, com) in Commands::iter().enumerate() {
+        println!(
+            "[{}] {} - {}",
+            i + 1,
+            com.to_short_desc(),
+            com.get_documentation()
+                .unwrap_or("<error - couldn't get mode description>")
+        )
+    }
 
     stdin().read_line(&mut mode).expect("Failed to read line.");
     trim_newline(&mut mode);
-
-    (|| match mode.as_str() {
-        "1" => {
-            let mut username = String::new();
-            let mut vod = String::new();
-            let mut initial_stamp = String::new();
-
-            println!("Please enter the streamer's username:");
-            stdin()
-                .read_line(&mut username)
-                .expect("Failed to read line.");
-            trim_newline(&mut username);
-            println!("Please enter the VOD/broadcast ID:");
-            stdin().read_line(&mut vod).expect("Failed to read line.");
-            trim_newline(&mut vod);
-            println!("Please enter the timestamp:");
-            stdin()
-                .read_line(&mut initial_stamp)
-                .expect("Failed to read line.");
-            trim_newline(&mut initial_stamp);
-
-            let valid_urls = match exact(
-                username.as_str(),
-                match vod.parse::<i64>() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("{}", e);
-                        return;
-                    }
-                },
-                initial_stamp.as_str(),
-                matches.clone(),
-            ) {
-                Ok(u) => match u {
-                    Some(u) => u,
-                    None => Vec::new(),
-                },
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-            if !valid_urls.is_empty() {
-                if valid_urls[0].muted {
-                    let mut response = String::new();
-
-                    println!("Do you want to download the fixed playlist? (Y/n)");
-                    stdin()
-                        .read_line(&mut response)
-                        .expect("Failed to read line.");
-                    trim_newline(&mut response);
-
-                    match response.to_lowercase().as_str() {
-                        "y" | "" => {
-                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    error!("{}", e);
-                                    return;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
+    let mode = match mode.parse::<usize>() {
+        Ok(res) => res,
+        Err(_) => {
+            error!("Couldn't select the specified mode");
+            any_key_to_continue("Press any key to close...");
             return;
         }
-        "2" => {
-            let mut username = String::new();
-            let mut vod = String::new();
-            let mut initial_from_stamp = String::new();
-            let mut initial_to_stamp = String::new();
+    };
 
-            println!("Please enter the streamer's username:");
-            stdin()
-                .read_line(&mut username)
-                .expect("Failed to read line.");
-            trim_newline(&mut username);
-            println!("Please enter the VOD/broadcast ID:");
-            stdin().read_line(&mut vod).expect("Failed to read line.");
-            trim_newline(&mut vod);
-            println!("Please enter the first timestamp:");
-            stdin()
-                .read_line(&mut initial_from_stamp)
-                .expect("Failed to read line.");
-            trim_newline(&mut initial_from_stamp);
-            println!("Please enter the last timestamp:");
-            stdin()
-                .read_line(&mut initial_to_stamp)
-                .expect("Failed to read line.");
-            trim_newline(&mut initial_to_stamp);
+    (|| match Commands::from_selector(mode) {
+        Some(sub) => match sub {
+            Commands::Exact { .. } => {
+                let mut username = String::new();
+                let mut vod = String::new();
+                let mut initial_stamp = String::new();
 
-            let valid_urls = match bruteforcer(
-                username.as_str(),
-                match vod.parse::<i64>() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        error!("{}", e);
-                        return;
-                    }
-                },
-                initial_from_stamp.as_str(),
-                initial_to_stamp.as_str(),
-                matches.clone(),
-            ) {
-                Ok(u) => match u {
-                    Some(u) => u,
-                    None => Vec::new(),
-                },
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-            if !valid_urls.is_empty() {
-                if valid_urls[0].muted {
-                    let mut response = String::new();
+                println!("Please enter the streamer's username:");
+                stdin()
+                    .read_line(&mut username)
+                    .expect("Failed to read line.");
+                trim_newline(&mut username);
+                println!("Please enter the VOD/broadcast ID:");
+                stdin().read_line(&mut vod).expect("Failed to read line.");
+                trim_newline(&mut vod);
+                println!("Please enter the timestamp:");
+                stdin()
+                    .read_line(&mut initial_stamp)
+                    .expect("Failed to read line.");
+                trim_newline(&mut initial_stamp);
 
-                    println!("Do you want to download the fixed playlist? (Y/n)");
-                    stdin()
-                        .read_line(&mut response)
-                        .expect("Failed to read line.");
-                    trim_newline(&mut response);
-
-                    match response.to_lowercase().as_str() {
-                        "y" | "" => {
-                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    error!("{}", e);
-                                    return;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            return;
-        }
-        "3" => {
-            let mut url = String::new();
-
-            println!("Please enter the TwitchTracker or StreamsCharts URL:");
-            stdin().read_line(&mut url).expect("Failed to read line.");
-            trim_newline(&mut url);
-
-            let (proc, data) = match derive_date_from_url(&url, matches.clone()) {
-                Ok(a) => a,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
-            let valid_urls = match proc {
-                ProcessingType::Exact => {
-                    match exact(
-                        data.username.as_str(),
-                        match data.broadcast_id.parse::<i64>() {
-                            Ok(b) => b,
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
-                            }
-                        },
-                        data.start_date.as_str(),
-                        matches.clone(),
-                    ) {
-                        Ok(u) => match u {
-                            Some(u) => u,
-                            None => Vec::new(),
-                        },
+                let valid_urls = match exact(
+                    username.as_str(),
+                    match vod.parse::<i64>() {
+                        Ok(v) => v,
                         Err(e) => {
                             error!("{}", e);
                             return;
                         }
+                    },
+                    initial_stamp.as_str(),
+                    matches.clone(),
+                ) {
+                    Ok(u) => match u {
+                        Some(u) => u,
+                        None => Vec::new(),
+                    },
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+                if !valid_urls.is_empty() {
+                    if valid_urls[0].muted {
+                        let mut response = String::new();
+
+                        println!("Do you want to download the fixed playlist? (Y/n)");
+                        stdin()
+                            .read_line(&mut response)
+                            .expect("Failed to read line.");
+                        trim_newline(&mut response);
+
+                        match response.to_lowercase().as_str() {
+                            "y" | "" => {
+                                match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        error!("{}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
-                ProcessingType::Bruteforce => {
-                    let end_date = match data.end_date {
-                        Some(d) => d,
-                        None => {
-                            error!("Couldn't get the end date for the bruteforce method");
-                            return;
-                        }
-                    };
-                    match bruteforcer(
-                        data.username.as_str(),
-                        match data.broadcast_id.parse::<i64>() {
-                            Ok(b) => b,
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
-                            }
-                        },
-                        data.start_date.as_str(),
-                        end_date.as_str(),
-                        matches.clone(),
-                    ) {
-                        Ok(u) => match u {
-                            Some(u) => u,
-                            None => Vec::new(),
-                        },
+
+                return;
+            }
+            Commands::Bruteforce { .. } => {
+                let mut username = String::new();
+                let mut vod = String::new();
+                let mut initial_from_stamp = String::new();
+                let mut initial_to_stamp = String::new();
+
+                println!("Please enter the streamer's username:");
+                stdin()
+                    .read_line(&mut username)
+                    .expect("Failed to read line.");
+                trim_newline(&mut username);
+                println!("Please enter the VOD/broadcast ID:");
+                stdin().read_line(&mut vod).expect("Failed to read line.");
+                trim_newline(&mut vod);
+                println!("Please enter the first timestamp:");
+                stdin()
+                    .read_line(&mut initial_from_stamp)
+                    .expect("Failed to read line.");
+                trim_newline(&mut initial_from_stamp);
+                println!("Please enter the last timestamp:");
+                stdin()
+                    .read_line(&mut initial_to_stamp)
+                    .expect("Failed to read line.");
+                trim_newline(&mut initial_to_stamp);
+
+                let valid_urls = match bruteforcer(
+                    username.as_str(),
+                    match vod.parse::<i64>() {
+                        Ok(v) => v,
                         Err(e) => {
                             error!("{}", e);
                             return;
                         }
+                    },
+                    initial_from_stamp.as_str(),
+                    initial_to_stamp.as_str(),
+                    matches.clone(),
+                ) {
+                    Ok(u) => match u {
+                        Some(u) => u,
+                        None => Vec::new(),
+                    },
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+                if !valid_urls.is_empty() {
+                    if valid_urls[0].muted {
+                        let mut response = String::new();
+
+                        println!("Do you want to download the fixed playlist? (Y/n)");
+                        stdin()
+                            .read_line(&mut response)
+                            .expect("Failed to read line.");
+                        trim_newline(&mut response);
+
+                        match response.to_lowercase().as_str() {
+                            "y" | "" => {
+                                match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        error!("{}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
-            };
-            if !valid_urls.is_empty() {
-                if valid_urls[0].muted {
-                    let mut response = String::new();
 
-                    println!("Do you want to download the fixed playlist? (Y/n)");
-                    stdin()
-                        .read_line(&mut response)
-                        .expect("Failed to read line.");
-                    trim_newline(&mut response);
+                return;
+            }
+            Commands::Link { .. } => {
+                let mut url = String::new();
 
-                    match response.to_lowercase().as_str() {
-                        "y" | "" => {
-                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
-                                Ok(_) => {}
+                println!("Please enter the TwitchTracker or StreamsCharts URL:");
+                stdin().read_line(&mut url).expect("Failed to read line.");
+                trim_newline(&mut url);
+
+                let (proc, data) = match derive_date_from_url(&url, matches.clone()) {
+                    Ok(a) => a,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+
+                let valid_urls = match proc {
+                    ProcessingType::Exact => {
+                        match exact(
+                            data.username.as_str(),
+                            match data.broadcast_id.parse::<i64>() {
+                                Ok(b) => b,
                                 Err(e) => {
                                     error!("{}", e);
                                     return;
                                 }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            return;
-        }
-        "4" => {
-            let mut username = String::new();
-
-            println!("Please enter the streamer's username:");
-            stdin()
-                .read_line(&mut username)
-                .expect("Failed to read line.");
-            trim_newline(&mut username);
-
-            let valid_urls = match live(username.as_str(), matches.clone()) {
-                Ok(u) => match u {
-                    Some(u) => u,
-                    None => Vec::new(),
-                },
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-            if !valid_urls.is_empty() {
-                if valid_urls[0].muted {
-                    let mut response = String::new();
-
-                    println!("Do you want to download the fixed playlist? (Y/n)");
-                    stdin()
-                        .read_line(&mut response)
-                        .expect("Failed to read line.");
-                    trim_newline(&mut response);
-
-                    match response.to_lowercase().as_str() {
-                        "y" | "" => {
-                            match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    error!("{}", e);
-                                    return;
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-
-            return;
-        }
-        "5" => {
-            let mut clip = String::new();
-
-            println!("Please enter the clip's URL (twitch.tv/%username%/clip/%slug% and clips.twitch.tv/%slug% are both supported) or the slug (\"GentleAthleticWombatHoneyBadger-ohJAsKzGinIgFUx2\" for example):");
-            stdin().read_line(&mut clip).expect("Failed to read line.");
-            trim_newline(&mut clip);
-
-            match find_bid_from_clip(clip, matches.clone()) {
-                Ok(r) => match r {
-                    Some((username, vod)) => {
-                        let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
-                        let (_, data) = match derive_date_from_url(&url, matches.clone()) {
-                            Ok(a) => a,
-                            Err(e) => {
-                                error!("{}", e);
-                                return;
-                            }
-                        };
-
-                        let valid_urls = match exact(
-                            username.as_str(),
-                            vod,
+                            },
                             data.start_date.as_str(),
                             matches.clone(),
                         ) {
@@ -363,106 +237,251 @@ fn interface(matches: Cli) {
                                 error!("{}", e);
                                 return;
                             }
+                        }
+                    }
+                    ProcessingType::Bruteforce => {
+                        let end_date = match data.end_date {
+                            Some(d) => d,
+                            None => {
+                                error!("Couldn't get the end date for the bruteforce method");
+                                return;
+                            }
                         };
-                        if !valid_urls.is_empty() {
-                            if valid_urls[0].muted {
-                                let mut response = String::new();
-
-                                println!("Do you want to download the fixed playlist? (Y/n)");
-                                stdin()
-                                    .read_line(&mut response)
-                                    .expect("Failed to read line.");
-                                trim_newline(&mut response);
-
-                                match response.to_lowercase().as_str() {
-                                    "y" | "" => {
-                                        match fix(
-                                            valid_urls[0].playlist.as_str(),
-                                            None,
-                                            false,
-                                            matches,
-                                        ) {
-                                            Ok(_) => {}
-                                            Err(e) => {
-                                                error!("{}", e);
-                                                return;
-                                            }
-                                        }
-                                    }
-                                    _ => {}
+                        match bruteforcer(
+                            data.username.as_str(),
+                            match data.broadcast_id.parse::<i64>() {
+                                Ok(b) => b,
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
                                 }
+                            },
+                            data.start_date.as_str(),
+                            end_date.as_str(),
+                            matches.clone(),
+                        ) {
+                            Ok(u) => match u {
+                                Some(u) => u,
+                                None => Vec::new(),
+                            },
+                            Err(e) => {
+                                error!("{}", e);
+                                return;
                             }
                         }
                     }
-                    None => {}
-                },
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
+                };
+                if !valid_urls.is_empty() {
+                    if valid_urls[0].muted {
+                        let mut response = String::new();
 
+                        println!("Do you want to download the fixed playlist? (Y/n)");
+                        stdin()
+                            .read_line(&mut response)
+                            .expect("Failed to read line.");
+                        trim_newline(&mut response);
+
+                        match response.to_lowercase().as_str() {
+                            "y" | "" => {
+                                match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        error!("{}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                return;
+            }
+            Commands::Live { .. } => {
+                let mut username = String::new();
+
+                println!("Please enter the streamer's username:");
+                stdin()
+                    .read_line(&mut username)
+                    .expect("Failed to read line.");
+                trim_newline(&mut username);
+
+                let valid_urls = match live(username.as_str(), matches.clone()) {
+                    Ok(u) => match u {
+                        Some(u) => u,
+                        None => Vec::new(),
+                    },
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+                if !valid_urls.is_empty() {
+                    if valid_urls[0].muted {
+                        let mut response = String::new();
+
+                        println!("Do you want to download the fixed playlist? (Y/n)");
+                        stdin()
+                            .read_line(&mut response)
+                            .expect("Failed to read line.");
+                        trim_newline(&mut response);
+
+                        match response.to_lowercase().as_str() {
+                            "y" | "" => {
+                                match fix(valid_urls[0].playlist.as_str(), None, false, matches) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        error!("{}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
+                return;
+            }
+            Commands::Clip { .. } => {
+                let mut clip = String::new();
+
+                println!("Please enter the clip's URL (twitch.tv/%username%/clip/%slug% and clips.twitch.tv/%slug% are both supported) or the slug (\"GentleAthleticWombatHoneyBadger-ohJAsKzGinIgFUx2\" for example):");
+                stdin().read_line(&mut clip).expect("Failed to read line.");
+                trim_newline(&mut clip);
+
+                match find_bid_from_clip(clip, matches.clone()) {
+                    Ok(r) => match r {
+                        Some((username, vod)) => {
+                            let url =
+                                format!("https://twitchtracker.com/{}/streams/{}", username, vod);
+                            let (_, data) = match derive_date_from_url(&url, matches.clone()) {
+                                Ok(a) => a,
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
+                            };
+
+                            let valid_urls = match exact(
+                                username.as_str(),
+                                vod,
+                                data.start_date.as_str(),
+                                matches.clone(),
+                            ) {
+                                Ok(u) => match u {
+                                    Some(u) => u,
+                                    None => Vec::new(),
+                                },
+                                Err(e) => {
+                                    error!("{}", e);
+                                    return;
+                                }
+                            };
+                            if !valid_urls.is_empty() {
+                                if valid_urls[0].muted {
+                                    let mut response = String::new();
+
+                                    println!("Do you want to download the fixed playlist? (Y/n)");
+                                    stdin()
+                                        .read_line(&mut response)
+                                        .expect("Failed to read line.");
+                                    trim_newline(&mut response);
+
+                                    match response.to_lowercase().as_str() {
+                                        "y" | "" => {
+                                            match fix(
+                                                valid_urls[0].playlist.as_str(),
+                                                None,
+                                                false,
+                                                matches,
+                                            ) {
+                                                Ok(_) => {}
+                                                Err(e) => {
+                                                    error!("{}", e);
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+                        }
+                        None => {}
+                    },
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+
+                return;
+            }
+            Commands::Clipforce { .. } => {
+                let mut vod = String::new();
+                let mut start = String::new();
+                let mut end = String::new();
+
+                println!("Please enter the VOD/broadcast ID:");
+                stdin().read_line(&mut vod).expect("Failed to read line.");
+                trim_newline(&mut vod);
+                println!("Please enter the starting timestamp (in seconds):");
+                stdin().read_line(&mut start).expect("Failed to read line.");
+                trim_newline(&mut start);
+                println!("Please enter the end timestamp (in seconds):");
+                stdin().read_line(&mut end).expect("Failed to read line.");
+                trim_newline(&mut end);
+
+                let vod = match vod.parse::<i64>() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+                let start = match start.parse::<i64>() {
+                    Ok(s) => s,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+                let end = match end.parse::<i64>() {
+                    Ok(e) => e,
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+
+                clip_bruteforce(vod, start, end, matches);
+
+                return;
+            }
+            Commands::Fix { .. } => {
+                let mut url = String::new();
+
+                println!("Please enter Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported):");
+                stdin().read_line(&mut url).expect("Failed to read line.");
+                trim_newline(&mut url);
+
+                match fix(url.as_str(), None, false, matches) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        error!("{}", e);
+                        return;
+                    }
+                };
+
+                return;
+            }
+        },
+        None => {
+            error!("Couldn't select the specified mode");
             return;
         }
-        "6" => {
-            let mut vod = String::new();
-            let mut start = String::new();
-            let mut end = String::new();
-
-            println!("Please enter the VOD/broadcast ID:");
-            stdin().read_line(&mut vod).expect("Failed to read line.");
-            trim_newline(&mut vod);
-            println!("Please enter the starting timestamp (in seconds):");
-            stdin().read_line(&mut start).expect("Failed to read line.");
-            trim_newline(&mut start);
-            println!("Please enter the end timestamp (in seconds):");
-            stdin().read_line(&mut end).expect("Failed to read line.");
-            trim_newline(&mut end);
-
-            let vod = match vod.parse::<i64>() {
-                Ok(v) => v,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-            let start = match start.parse::<i64>() {
-                Ok(s) => s,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-            let end = match end.parse::<i64>() {
-                Ok(e) => e,
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
-            clip_bruteforce(vod, start, end, matches);
-
-            return;
-        }
-        "7" => {
-            let mut url = String::new();
-
-            println!("Please enter Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported):");
-            stdin().read_line(&mut url).expect("Failed to read line.");
-            trim_newline(&mut url);
-
-            match fix(url.as_str(), None, false, matches) {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("{}", e);
-                    return;
-                }
-            };
-
-            return;
-        }
-        _ => return,
     })();
 
     any_key_to_continue("Press any key to close...");

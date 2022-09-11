@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand};
+use std::{str::FromStr, string::ToString};
+use strum::{Display, EnumIter, EnumMessage, EnumString, EnumVariantNames, VariantNames};
 
 pub const CURL_UA: &str = "curl/7.54.0";
 
@@ -42,8 +44,22 @@ impl Default for Cli {
     }
 }
 
-#[derive(Subcommand, Clone, Debug)]
+#[derive(
+    Subcommand, Clone, Debug, EnumMessage, EnumIter, Display, EnumVariantNames, EnumString,
+)]
 pub enum Commands {
+    /// Combine all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL and check whether the VOD is available
+    Exact {
+        /// Streamer's username (string)
+        username: String,
+
+        /// VOD/broadcast ID (integer)
+        id: i64,
+
+        /// A timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
+        stamp: String,
+    },
+
     /// Go over a range of timestamps, looking for a usable/working m3u8 URL, and check whether the VOD is available
     Bruteforce {
         /// Streamer's username (string)
@@ -57,18 +73,6 @@ pub enum Commands {
 
         /// Last timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
         to: String,
-    },
-
-    /// Combine all the parts (streamer's username, VOD/broadcast ID and a timestamp) into a proper m3u8 URL and check whether the VOD is available
-    Exact {
-        /// Streamer's username (string)
-        username: String,
-
-        /// VOD/broadcast ID (integer)
-        id: i64,
-
-        /// A timestamp - either an integer (Unix time or whatever the fuck Twitch was using before) or a string (can be like "2020-11-12 20:02:13" or RFC 3339)
-        stamp: String,
     },
 
     /// Get the m3u8 from a TwitchTracker/StreamsCharts URL
@@ -114,4 +118,33 @@ pub enum Commands {
         #[clap(short, long)]
         slow: bool,
     },
+}
+
+impl Commands {
+    pub fn to_short_desc(&self) -> String {
+        match self {
+            Commands::Exact { .. } => "Exact mode".to_string(),
+            Commands::Bruteforce { .. } => "Bruteforce mode".to_string(),
+            Commands::Link { .. } => "Link mode".to_string(),
+            Commands::Live { .. } => "Live mode".to_string(),
+            Commands::Clip { .. } => "Clip mode".to_string(),
+            Commands::Clipforce { .. } => "Clip bruteforce mode".to_string(),
+            Commands::Fix { .. } => "Fix playlist".to_string(),
+        }
+    }
+
+    pub fn from_selector(s: usize) -> Option<Self> {
+        if s > 0 {
+            let s = s - 1;
+            match Commands::VARIANTS.get(s) {
+                Some(a) => match Commands::from_str(a) {
+                    Ok(e) => Some(e),
+                    Err(_) => None,
+                },
+                None => None,
+            }
+        } else {
+            None
+        }
+    }
 }
