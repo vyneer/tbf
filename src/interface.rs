@@ -7,13 +7,13 @@ use log::error;
 use std::io::{stdin, stdout, Write};
 use strum::{EnumMessage, IntoEnumIterator};
 
-use crate::config::{Cli, Commands};
+use crate::config::{Cli, Commands, ProcessingType};
 use crate::twitch::{
     clips::{clip_bruteforce, find_bid_from_clip},
     models::ReturnURL,
     vods::{bruteforcer, exact, fix, live},
 };
-use crate::util::{derive_date_from_url, ProcessingType};
+use crate::util::derive_date_from_url;
 
 impl Commands {
     fn fill_out_values(&mut self) -> Result<()> {

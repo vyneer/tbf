@@ -13,20 +13,13 @@ use time::{
 };
 use url::Url;
 
-use super::config::CURL_UA;
-use crate::config::Cli;
+use super::config::{Cli, ProcessingType, CURL_UA};
 use crate::error::DeriveDateError;
 use crate::twitch::models::CDN_URLS;
 
 lazy_static! {
     static ref RE_UNIX: Regex = Regex::new(r"^\d*$").unwrap();
     static ref RE_UTC: Regex = Regex::new("UTC").unwrap();
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ProcessingType {
-    Exact,
-    Bruteforce,
 }
 
 #[derive(Debug, PartialEq)]
@@ -183,14 +176,14 @@ pub fn derive_date_from_url(url: &str, flags: Cli) -> Result<(ProcessingType, UR
                                 Err(e) => Err(e)?,
                             };
 
-                            let extracted_results: ExtractedTimestamps = match flags.bruteforce {
-                                Some(true) => {
+                            let extracted_results: ExtractedTimestamps = match flags.mode {
+                                Some(ProcessingType::Bruteforce) => {
                                     if !flags.simple {
                                         info!("Bruteforcing for timestamps...");
                                     }
                                     sc_bruteforce_timestamps(&fragment)?
                                 }
-                                Some(false) => {
+                                Some(ProcessingType::Exact) => {
                                     if !flags.simple {
                                         info!("Extracting exact timestamps...");
                                     }
@@ -662,7 +655,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {bruteforce: Some(false), ..Default::default()})
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {mode: Some(ProcessingType::Exact), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Exact,
@@ -677,7 +670,7 @@ mod tests {
         );
 
         assert_eq!(
-            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {bruteforce: Some(true), ..Default::default()})
+            derive_date_from_url("https://streamscharts.com/channels/forsen/streams/39619965384", Cli {mode: Some(ProcessingType::Bruteforce), ..Default::default()})
                 .unwrap(),
             (
                 ProcessingType::Bruteforce,

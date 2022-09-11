@@ -1,8 +1,14 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::{str::FromStr, string::ToString};
 use strum::{Display, EnumIter, EnumMessage, EnumString, EnumVariantNames, VariantNames};
 
 pub const CURL_UA: &str = "curl/7.54.0";
+
+#[derive(Clone, Debug, PartialEq, ValueEnum)]
+pub enum ProcessingType {
+    Exact,
+    Bruteforce,
+}
 
 #[derive(Parser, Clone, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -23,9 +29,9 @@ pub struct Cli {
     #[clap(short, long)]
     pub progressbar: bool,
 
-    /// Explicitly use bruteforce mode for StreamsCharts
-    #[clap(short, long)]
-    pub bruteforce: Option<bool>,
+    /// Select the preferred processing mode for StreamsCharts
+    #[clap(short, long, arg_enum)]
+    pub mode: Option<ProcessingType>,
 
     #[clap(subcommand)]
     pub command: Option<Commands>,
@@ -34,11 +40,11 @@ pub struct Cli {
 impl Default for Cli {
     fn default() -> Self {
         Cli {
-            verbose: false,
             simple: false,
-            progressbar: false,
+            verbose: false,
             cdnfile: None,
-            bruteforce: None,
+            progressbar: false,
+            mode: None,
             command: None,
         }
     }
