@@ -1,8 +1,4 @@
 use anyhow::Result;
-use crossterm::{
-    event::{self, Event},
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
 use lazy_static::lazy_static;
 use log::debug;
 use log::info;
@@ -11,12 +7,7 @@ use regex::Regex;
 use reqwest::header::USER_AGENT;
 use scraper::{Html, Selector};
 use serde::Deserialize;
-use std::{
-    ffi::OsStr,
-    fs::File,
-    io::{stdout, Read, Write},
-    path::Path,
-};
+use std::{ffi::OsStr, fs::File, io::Read, path::Path};
 use time::{
     format_description::well_known::Rfc3339, macros::format_description, PrimitiveDateTime,
 };
@@ -63,33 +54,11 @@ pub struct ExtractedTimestamps {
     end_timestamp: i64,
 }
 
-pub fn any_key_to_continue(text: &str) {
-    enable_raw_mode().unwrap();
-    print!("\n{}", text);
-    stdout().flush().unwrap_or(());
-    loop {
-        match event::read().unwrap() {
-            Event::Key(..) => break,
-            _ => (),
-        };
-    }
-    disable_raw_mode().unwrap();
-}
-
 pub fn info(text: String, simple: bool) {
     if simple {
         println!("{}", text);
     } else {
         info!("{}", text);
-    }
-}
-
-pub fn trim_newline(s: &mut String) {
-    if s.ends_with('\n') {
-        s.pop();
-        if s.ends_with('\r') {
-            s.pop();
-        }
     }
 }
 

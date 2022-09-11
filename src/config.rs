@@ -123,21 +123,21 @@ pub enum Commands {
 impl Commands {
     pub fn to_short_desc(&self) -> String {
         match self {
-            Commands::Exact { .. } => "Exact mode".to_string(),
-            Commands::Bruteforce { .. } => "Bruteforce mode".to_string(),
-            Commands::Link { .. } => "Link mode".to_string(),
-            Commands::Live { .. } => "Live mode".to_string(),
-            Commands::Clip { .. } => "Clip mode".to_string(),
-            Commands::Clipforce { .. } => "Clip bruteforce mode".to_string(),
-            Commands::Fix { .. } => "Fix playlist".to_string(),
+            Self::Exact { .. } => "Exact mode".to_string(),
+            Self::Bruteforce { .. } => "Bruteforce mode".to_string(),
+            Self::Link { .. } => "Link mode".to_string(),
+            Self::Live { .. } => "Live mode".to_string(),
+            Self::Clip { .. } => "Clip mode".to_string(),
+            Self::Clipforce { .. } => "Clip bruteforce mode".to_string(),
+            Self::Fix { .. } => "Fix playlist".to_string(),
         }
     }
 
     pub fn from_selector(s: usize) -> Option<Self> {
         if s > 0 {
             let s = s - 1;
-            match Commands::VARIANTS.get(s) {
-                Some(a) => match Commands::from_str(a) {
+            match Self::VARIANTS.get(s) {
+                Some(a) => match Self::from_str(a) {
                     Ok(e) => Some(e),
                     Err(_) => None,
                 },

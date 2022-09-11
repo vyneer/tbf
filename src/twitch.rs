@@ -66,12 +66,12 @@ pub fn check_availability(
                     };
                     if unmuted == 200 {
                         Some(ReturnURL {
-                            playlist: url.playlist.clone(),
+                            url: url.playlist.clone(),
                             muted: false,
                         })
                     } else if muted == 200 {
                         Some(ReturnURL {
-                            playlist: url.playlist.clone(),
+                            url: url.playlist.clone(),
                             muted: true,
                         })
                     } else {
@@ -93,12 +93,12 @@ pub fn check_availability(
                     };
                     if unmuted == 200 {
                         Some(ReturnURL {
-                            playlist: url.playlist.clone(),
+                            url: url.playlist.clone(),
                             muted: false,
                         })
                     } else if muted == 200 {
                         Some(ReturnURL {
-                            playlist: url.playlist.clone(),
+                            url: url.playlist.clone(),
                             muted: true,
                         })
                     } else {
@@ -130,10 +130,10 @@ mod tests {
         );
 
         let comp_working: Vec<ReturnURL> = vec![ReturnURL {
-            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }, ReturnURL {
-            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }];
 

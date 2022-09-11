@@ -144,7 +144,7 @@ pub fn bruteforcer(
                     );
                 }
                 for url in &valid_urls {
-                    info(url.playlist.clone(), flags.simple);
+                    info(url.url.clone(), flags.simple);
                 }
                 Ok(Some(valid_urls))
             } else {
@@ -197,7 +197,7 @@ pub fn exact(
             );
         }
         for url in &valid_urls {
-            info(url.playlist.clone(), flags.simple);
+            info(url.url.clone(), flags.simple);
         }
         Ok(Some(valid_urls))
     } else {
@@ -493,10 +493,10 @@ mod tests {
         .unwrap()
         .unwrap();
         let bf_comp: Vec<ReturnURL> = vec![ReturnURL {
-            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }, ReturnURL {
-            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }];
 
@@ -535,10 +535,10 @@ mod tests {
         .unwrap()
         .unwrap();
         let e_comp: Vec<ReturnURL> = vec![ReturnURL {
-            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }, ReturnURL {
-            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }];
 
