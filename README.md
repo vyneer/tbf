@@ -101,6 +101,10 @@ Provide minimal output.
 
 Show more info.
 
+### -m, --mode
+
+Select the preferred processing mode for StreamsCharts [possible values: exact, bruteforce].
+
 ### -p, --progressbar
 
 Enable a progress bar (which *might* slow stuff down according to [this](https://github.com/mitsuhiko/indicatif/issues/170))
