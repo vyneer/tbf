@@ -7,9 +7,9 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use std::{collections::HashMap, str::FromStr};
 use url::Url;
 
-use crate::config::Flags;
+use crate::config::Cli;
 use crate::error::ClipError;
-use crate::twitch::models;
+use crate::twitch::models::{ClipQuery, ClipResponse, ClipVars, ReturnURL};
 use crate::util::info;
 
 fn extract_slug(s: String) -> Result<Option<String>> {
@@ -62,7 +62,7 @@ fn extract_slug(s: String) -> Result<Option<String>> {
     }
 }
 
-pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64)>> {
+pub fn find_bid_from_clip(s: String, flags: Cli) -> Result<Option<(String, i64)>> {
     let slug = match extract_slug(s) {
         Ok(s) => match s {
             Some(s) => s,
@@ -89,9 +89,9 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
         header_map.insert(key, val);
     }
 
-    let query = models::ClipQuery {
+    let query = ClipQuery {
         query: "query($slug:ID!){clip(slug: $slug){broadcaster{login}broadcast{id}}}".to_string(),
-        variables: models::ClipVars { slug },
+        variables: ClipVars { slug },
     };
 
     let request = crate::HTTP_CLIENT
@@ -103,7 +103,7 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
         Ok(r) => r,
         Err(e) => return Err(e)?,
     };
-    let data: models::ClipResponse = match re.json() {
+    let data: ClipResponse = match re.json() {
         Ok(d) => d,
         Err(e) => {
             if !flags.simple {
@@ -121,17 +121,21 @@ pub fn find_bid_from_clip(s: String, flags: Flags) -> Result<Option<(String, i64
     )))
 }
 
-pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
+pub fn clip_bruteforce(
+    vod: i64,
+    start: i64,
+    end: i64,
+    flags: Cli,
+) -> Result<Option<Vec<ReturnURL>>> {
     let vod = vod.to_string();
     let pb = ProgressBar::new((end - start) as u64);
     let cloned_pb = pb.clone();
 
     let iter = (start..end).into_par_iter();
     let iter_pb = (start..end).into_par_iter().progress_with(pb);
-    let res: Vec<String>;
 
-    if flags.pbar {
-        res = iter_pb.filter_map( |number| {
+    let res: Vec<ReturnURL> = if flags.progressbar {
+        iter_pb.filter_map( |number| {
             let url = format!("https://clips-media-assets2.twitch.tv/AT-cm%7C{}-offset-{}-360.mp4", vod, number);
             let res = match crate::HTTP_CLIENT.get(url.as_str()).send() {
                 Ok(r) => r,
@@ -141,7 +145,10 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
                 if flags.verbose {
                     cloned_pb.println(format!("Got a clip! - {}", url));
                 }
-                Some(url)
+                Some(ReturnURL {
+                    url,
+                    muted: false,
+                })
             } else if res.status() == 403 {
                 if flags.verbose {
                     cloned_pb.println(format!("Still going! - {}", url));
@@ -151,9 +158,9 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
                 cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
                 None
             }
-        }).collect();
+        }).collect()
     } else {
-        res = iter.filter_map( |number| {
+        iter.filter_map( |number| {
             let url = format!("https://clips-media-assets2.twitch.tv/AT-cm%7C{}-offset-{}-360.mp4", vod, number);
             let res = match crate::HTTP_CLIENT.get(url.as_str()).send() {
                 Ok(r) => r,
@@ -163,7 +170,10 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
                 if flags.verbose {
                     cloned_pb.println(format!("Got a clip! - {}", url));
                 }
-                Some(url)
+                Some(ReturnURL {
+                    url,
+                    muted: false,
+                })
             } else if res.status() == 403 {
                 if flags.verbose {
                     cloned_pb.println(format!("Still going! - {}", url));
@@ -173,26 +183,27 @@ pub fn clip_bruteforce(vod: i64, start: i64, end: i64, flags: Flags) {
                 cloned_pb.println(format!("You might be getting throttled (or your connection is dead)! Status code: {} - URL: {}", res.status(), res.url()));
                 None
             }
-        }).collect();
-    }
+        }).collect()
+    };
 
     if !res.is_empty() {
         if !flags.simple {
             info!("{}! Here are the URLs:", "Got some clips".green());
         }
-        for line in res {
-            info(line, flags.simple);
+        for line in res.clone() {
+            info(line.url, flags.simple);
         }
     } else {
         if !flags.simple {
             info!("{}", "Couldn't find anything :(".red());
         }
     }
+    Ok(Some(res))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::config::Flags;
+    use crate::config::Cli;
 
     use super::{extract_slug as es, find_bid_from_clip as bid};
 
@@ -233,7 +244,7 @@ mod tests {
         assert_eq!(
             bid(
                 "SpotlessCrypticStapleAMPTropPunch-H_rVu0mGfGLNMlEx".to_string(),
-                Flags::default()
+                Cli::default()
             )
             .unwrap(),
             Some(("mrmouton".to_string(), 39905263305)),
@@ -242,7 +253,7 @@ mod tests {
         assert_eq!(
             bid(
                 "SpotlessCrypticStapleAMPTropPunch-H_rVu0mfGLNMlEx".to_string(),
-                Flags::default()
+                Cli::default()
             )
             .unwrap(),
             None,

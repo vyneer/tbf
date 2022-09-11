@@ -9,7 +9,7 @@ use regex::Regex;
 use reqwest::StatusCode;
 use sha1::{Digest, Sha1};
 
-use crate::config::Flags;
+use crate::config::Cli;
 use crate::error::PlaylistFixError;
 use crate::twitch::{
     check_availability,
@@ -26,7 +26,7 @@ pub fn bruteforcer(
     vod: i64,
     initial_from_stamp: &str,
     initial_to_stamp: &str,
-    flags: Flags,
+    flags: Cli,
 ) -> Result<Option<Vec<ReturnURL>>> {
     let number1 = match parse_timestamp(initial_from_stamp) {
         Ok(d) => d,
@@ -69,7 +69,7 @@ pub fn bruteforcer(
     let iter_pb = all_formats_vec.par_iter().progress_with(pb);
 
     let final_url: Option<&TwitchURL>;
-    if flags.pbar {
+    if flags.progressbar {
         final_url = iter_pb.find_any( |url| {
             let res = crate::HTTP_CLIENT.get(&url.full_url.clone()).send();
             match res {
@@ -144,7 +144,7 @@ pub fn bruteforcer(
                     );
                 }
                 for url in &valid_urls {
-                    info(url.playlist.clone(), flags.simple);
+                    info(url.url.clone(), flags.simple);
                 }
                 Ok(Some(valid_urls))
             } else {
@@ -171,7 +171,7 @@ pub fn exact(
     username: &str,
     vod: i64,
     initial_stamp: &str,
-    flags: Flags,
+    flags: Cli,
 ) -> Result<Option<Vec<ReturnURL>>> {
     let number = match parse_timestamp(initial_stamp) {
         Ok(d) => d,
@@ -197,7 +197,7 @@ pub fn exact(
             );
         }
         for url in &valid_urls {
-            info(url.playlist.clone(), flags.simple);
+            info(url.url.clone(), flags.simple);
         }
         Ok(Some(valid_urls))
     } else {
@@ -212,7 +212,7 @@ pub fn exact(
     }
 }
 
-pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) -> Result<()> {
+pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Cli) -> Result<()> {
     if !(url.contains("twitch.tv") || url.contains("cloudfront.net")) {
         error!("Only twitch.tv and cloudfront.net URLs are supported");
         return Err(PlaylistFixError::URLError)?;
@@ -260,7 +260,7 @@ pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) ->
                     let url = format!("{}{}", base_url, segment.uri);
                     initial_url_vec.push(url);
                 }
-                if flags.pbar {
+                if flags.progressbar {
                     let pb = ProgressBar::new(initial_url_vec.len() as u64);
                     let cloned_pb = pb.clone();
                     initial_url_vec
@@ -318,7 +318,7 @@ pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) ->
                     debug!("Added this .ts file - {:?}", initial_url_vec[i])
                 }
             } else {
-                if flags.pbar {
+                if flags.progressbar {
                     let pb = ProgressBar::new(pl.segments.len() as u64);
                     let cloned_pb = pb.clone();
                     for segment in pl.segments.iter().progress_with(pb) {
@@ -394,7 +394,7 @@ pub fn fix(url: &str, output: Option<String>, old_method: bool, flags: Flags) ->
     Ok(())
 }
 
-pub fn live(username: &str, flags: Flags) -> Result<Option<Vec<ReturnURL>>> {
+pub fn live(username: &str, flags: Cli) -> Result<Option<Vec<ReturnURL>>> {
     match util::find_bid_from_username(username, flags.clone()) {
         Ok(res) => match res {
             Some((bid, stamp)) => exact(username, bid, stamp.as_str(), flags),
@@ -410,10 +410,10 @@ mod util {
     use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
     use std::{collections::HashMap, str::FromStr};
 
-    use crate::config::Flags;
+    use crate::config::Cli;
     use crate::twitch::models::{VodQuery, VodResponse, VodVars};
 
-    pub fn find_bid_from_username(username: &str, flags: Flags) -> Result<Option<(i64, String)>> {
+    pub fn find_bid_from_username(username: &str, flags: Cli) -> Result<Option<(i64, String)>> {
         let endpoint = "https://gql.twitch.tv/gql";
         let mut headers = HashMap::new();
         headers.insert("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko");
@@ -477,7 +477,7 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use crate::{config::Flags, twitch::models::ReturnURL};
+    use crate::{config::Cli, twitch::models::ReturnURL};
 
     use super::{bruteforcer, exact as ex, fix};
 
@@ -488,15 +488,15 @@ mod tests {
             42218705421,
             &"2021-06-05 00:50:16",
             &"2021-06-05 00:50:18",
-            Flags::default(),
+            Cli::default(),
         )
         .unwrap()
         .unwrap();
         let bf_comp: Vec<ReturnURL> = vec![ReturnURL {
-            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }, ReturnURL {
-            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }];
 
@@ -507,7 +507,7 @@ mod tests {
             42218705421,
             &"2021-06-05 00:50:16",
             &"2021-06-05 00:50:18",
-            Flags::default(),
+            Cli::default(),
         )
         .unwrap();
 
@@ -518,7 +518,7 @@ mod tests {
             39905263305,
             &"2022-07-12 1200",
             &"2022-07-12 12:00:41",
-            Flags::default(),
+            Cli::default(),
         );
 
         assert!(bf_err.is_err(), "testing invalid bruteforce");
@@ -530,15 +530,15 @@ mod tests {
             &"dansgaming",
             42218705421,
             &"2021-06-05 00:50:17",
-            Flags::default(),
+            Cli::default(),
         )
         .unwrap()
         .unwrap();
         let e_comp: Vec<ReturnURL> = vec![ReturnURL {
-            playlist: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }, ReturnURL {
-            playlist: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
+            url: "https://d2vjef5jvl6bfs.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8".to_string(),
             muted: false,
         }];
 
@@ -548,18 +548,13 @@ mod tests {
             &"dansgming",
             42218705421,
             &"2021-06-05 00:50:17",
-            Flags::default(),
+            Cli::default(),
         )
         .unwrap();
 
         assert_eq!(e_wrong, None, "testing exact with no results");
 
-        let e_err = ex(
-            &"mrmouton",
-            39905263305,
-            &"2022-07-12 1200",
-            Flags::default(),
-        );
+        let e_err = ex(&"mrmouton", 39905263305, &"2022-07-12 1200", Cli::default());
 
         assert!(e_err.is_err(), "testing invalid exact");
     }
@@ -570,7 +565,7 @@ mod tests {
 
         let path = dir.path().join("test.m3u8");
 
-        fix(&"https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8", Some(path.to_str().unwrap().to_string()), false, Flags::default()).unwrap();
+        fix(&"https://d1m7jfoe9zdc1j.cloudfront.net/d3dcbaf880c9e36ed8c8_dansgaming_42218705421_1622854217/chunked/index-dvr.m3u8", Some(path.to_str().unwrap().to_string()), false, Cli::default()).unwrap();
 
         let r = BufReader::new(File::open(path).unwrap());
         let mut count = 0;
