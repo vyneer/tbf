@@ -13,6 +13,7 @@ use crate::twitch::{
     models::ReturnURL,
     vods::{bruteforcer, exact, fix, live},
 };
+use crate::update::update;
 use crate::util::derive_date_from_url;
 
 impl Commands {
@@ -105,22 +106,23 @@ impl Commands {
                 ask_for_value("Please enter Twitch VOD m3u8 playlist URL (only twitch.tv and cloudfront.net URLs are supported):", url);
                 Ok(())
             }
+            Self::Update => Ok(()),
         }
     }
 
-    pub fn execute(self, matches: Cli) -> Result<Option<Vec<ReturnURL>>> {
+    pub fn execute(&self, matches: Cli) -> Result<Option<Vec<ReturnURL>>> {
         match self {
             Self::Exact {
                 username,
                 id,
                 stamp,
-            } => exact(username.as_str(), id, stamp.as_str(), matches),
+            } => exact(username.as_str(), *id, stamp.as_str(), matches),
             Self::Bruteforce {
                 username,
                 id,
                 from,
                 to,
-            } => bruteforcer(username.as_str(), id, from.as_str(), to.as_str(), matches),
+            } => bruteforcer(username.as_str(), *id, from.as_str(), to.as_str(), matches),
             Self::Link { url } => {
                 let (proc, data) = match derive_date_from_url(&url, matches.clone()) {
                     Ok(a) => a,
@@ -163,7 +165,7 @@ impl Commands {
                 }
             }
             Self::Live { username } => live(username.as_str(), matches),
-            Self::Clip { clip } => match find_bid_from_clip(clip, matches.clone()) {
+            Self::Clip { clip } => match find_bid_from_clip(clip.clone(), matches.clone()) {
                 Ok(r) => match r {
                     Some((username, vod)) => {
                         let url = format!("https://twitchtracker.com/{}/streams/{}", username, vod);
@@ -178,12 +180,19 @@ impl Commands {
                 },
                 Err(e) => Err(e)?,
             },
-            Self::Clipforce { id, start, end } => clip_bruteforce(id, start, end, matches),
+            Self::Clipforce { id, start, end } => clip_bruteforce(*id, *start, *end, matches),
             Self::Fix { url, output, slow } => {
-                fix(url.as_str(), output, slow, matches).expect("fix - shouldn't happen");
+                fix(url.as_str(), output.clone(), *slow, matches).expect("fix - shouldn't happen");
 
                 // this might not be the right way to this
                 // but i want to combine everything into one method
+                Ok(None)
+            }
+            Self::Update => {
+                match update(matches) {
+                    Ok(_) => (),
+                    Err(e) => return Err(e)?
+                }
                 Ok(None)
             }
         }
@@ -253,25 +262,26 @@ pub fn main_interface(mut matches: Cli) {
 
     println!("Select the application mode:");
     for (i, com) in Commands::iter().enumerate() {
-        println!(
-            "[{}] {} - {}",
-            i + 1,
-            com.to_short_desc(),
-            com.get_documentation()
-                .unwrap_or("<error - couldn't get mode description>")
-        )
+        let selector = match com.to_selector() {
+            Some(str) => str,
+            None => (i + 1).to_string(),
+        };
+        let name = com.to_short_desc();
+
+        match com.show_description() {
+            true => println!(
+                "[{}] {} - {}",
+                selector,
+                name,
+                com.get_documentation()
+                    .unwrap_or("<error - couldn't get mode description>")
+            ),
+            false => println!("[{}] {}", selector, name,),
+        }
     }
 
     stdin().read_line(&mut mode).expect("Failed to read line.");
     trim_newline(&mut mode);
-    let mode = match mode.parse::<usize>() {
-        Ok(res) => res,
-        Err(_) => {
-            error!("Couldn't select the specified mode");
-            any_key_to_continue("Press any key to close...");
-            return;
-        }
-    };
 
     (|| match Commands::from_selector(mode) {
         Some(mut sub) => {
