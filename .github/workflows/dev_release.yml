@@ -1,0 +1,66 @@
+name: Development Release
+
+permissions:
+  contents: write
+  id-token: write
+  packages: write
+  pull-requests: read
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  nightly-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dev-drprasad/delete-older-releases@v0.2.0
+        with:
+          keep_latest: 1
+          delete_tags: true
+          delete_tag_pattern: dev+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - id: date
+        run: echo "::set-output name=date::$(TZ='UTC' date +'%Y-%m-%dT%H:%M:%SZ')"
+      - id: commit
+        uses: pr-mpt/actions-commit-hash@v1
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: dev+${{ steps.commit.outputs.short }}
+          prerelease: true
+          title: "Development Build - ${{ steps.date.outputs.date }} - dev+${{ steps.commit.outputs.short }}"
+
+  upload-assets:
+    needs: nightly-release
+    strategy:
+      matrix:
+        include:
+          - target: aarch64-linux-android
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-gnu
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - id: commit
+        uses: pr-mpt/actions-commit-hash@v1
+      - uses: actions/checkout@v3
+      - uses: taiki-e/upload-rust-binary-action@v1
+        with:
+          ref: refs/tags/dev+${{ steps.commit.outputs.short }}
+          bin: tbf
+          include: LICENSE,README.md
+          target: ${{ matrix.target }}
+          archive: $bin-$tag-$target
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
