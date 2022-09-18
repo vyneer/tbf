@@ -191,7 +191,7 @@ impl Commands {
             Self::Update => {
                 match update(matches) {
                     Ok(_) => (),
-                    Err(e) => return Err(e)?
+                    Err(e) => return Err(e)?,
                 }
                 Ok(None)
             }

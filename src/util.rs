@@ -71,9 +71,9 @@ pub fn get_useragent_list() -> Vec<String> {
                 useragent_vec.retain(|a| !a.contains("X11;"));
                 useragent_vec
             }
-            false => vec![]
+            false => vec![],
         },
-        Err(_) => vec![]
+        Err(_) => vec![],
     }
 }
 
@@ -506,16 +506,19 @@ fn sc_bruteforce_timestamps(html_fragment: &Html) -> Result<ExtractedTimestamps>
 
 #[cfg(test)]
 mod tests {
+    use reqwest::header::USER_AGENT;
     use std::fs::File;
     use std::io::Write;
-    use tempfile::tempdir;
-    use reqwest::header::USER_AGENT;
     use std::thread::sleep;
+    use tempfile::tempdir;
 
     use crate::config::Cli;
     use crate::twitch::models::CDN_URLS;
 
-    use super::{compile_cdn_list, derive_date_from_url, parse_timestamp, get_useragent_list, ProcessingType, URLData};
+    use super::{
+        compile_cdn_list, derive_date_from_url, get_useragent_list, parse_timestamp,
+        ProcessingType, URLData,
+    };
 
     #[test]
     fn compile_cdns() {
@@ -711,9 +714,19 @@ mod tests {
         let ua_vec = get_useragent_list();
 
         for ua in ua_vec {
-            let init_resp = crate::HTTP_CLIENT.get(url).header(USER_AGENT, &ua).send().unwrap();
+            let init_resp = crate::HTTP_CLIENT
+                .get(url)
+                .header(USER_AGENT, &ua)
+                .send()
+                .unwrap();
             sleep(std::time::Duration::from_secs(2));
-            assert_eq!(init_resp.status(), 200, "testing useragents: ua - {}, url - {}", &ua, url);
+            assert_eq!(
+                init_resp.status(),
+                200,
+                "testing useragents: ua - {}, url - {}",
+                &ua,
+                url
+            );
         }
     }
 }
