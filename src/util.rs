@@ -55,7 +55,7 @@ pub fn info(text: String, simple: bool) {
     }
 }
 
-pub fn get_random_useragent() -> String {
+pub fn get_useragent_list() -> Vec<String> {
     let resp = crate::HTTP_CLIENT
         .get("https://jnrbsn.github.io/user-agents/user-agents.json")
         .send();
@@ -65,21 +65,29 @@ pub fn get_random_useragent() -> String {
             true => {
                 let mut useragent_vec: Vec<String> = match r.json() {
                     Ok(v) => v,
-                    Err(_) => return CURL_UA.to_string(),
+                    Err(_) => vec![],
                 };
                 // apparently streamscharts doesnt like when the useragent has "X11" in it
                 useragent_vec.retain(|a| !a.contains("X11;"));
-                return match useragent_vec.choose(&mut rand::thread_rng()) {
-                    Some(ua) => ua.to_owned(),
-                    None => CURL_UA.to_string(),
-                };
+                useragent_vec
             }
-            false => {}
+            false => vec![]
         },
-        Err(_) => {}
+        Err(_) => vec![]
     }
+}
 
-    return CURL_UA.to_string();
+pub fn get_random_useragent() -> String {
+    let ua_vector = get_useragent_list();
+
+    if !ua_vector.is_empty() {
+        match ua_vector.choose(&mut rand::thread_rng()) {
+            Some(ua) => ua.to_owned(),
+            None => CURL_UA.to_string(),
+        }
+    } else {
+        CURL_UA.to_string()
+    }
 }
 
 fn process_url(url: &str) -> Result<Html> {
@@ -501,11 +509,13 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
+    use reqwest::header::USER_AGENT;
+    use std::thread::sleep;
 
     use crate::config::Cli;
     use crate::twitch::models::CDN_URLS;
 
-    use super::{compile_cdn_list, derive_date_from_url, parse_timestamp, ProcessingType, URLData};
+    use super::{compile_cdn_list, derive_date_from_url, parse_timestamp, get_useragent_list, ProcessingType, URLData};
 
     #[test]
     fn compile_cdns() {
@@ -692,5 +702,18 @@ mod tests {
         assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/streams/3961965384", Cli::default()).is_err(), "testing wrong streamscharts link 1 - https://streamscharts.com/channels/forsen/streams/3961965384");
         assert!(derive_date_from_url("https://twitchtracker.com/forsen/sreams/39619965384", Cli::default()).is_err(), "testing wrong twitchtracker link 2 - https://twitchtracker.com/forsen/sreams/39619965384");
         assert!(derive_date_from_url("https://streamscharts.com/channels/forsen/sreams/39619965384", Cli::default()).is_err(), "testing wrong streamscharts link 2 - https://streamscharts.com/channels/forsen/sreams/39619965384");
+    }
+
+    #[test]
+    #[ignore]
+    fn streamscharts_useragent_check() {
+        let url = "https://streamscharts.com/channels/robcdee/streams/39648192487";
+        let ua_vec = get_useragent_list();
+
+        for ua in ua_vec {
+            let init_resp = crate::HTTP_CLIENT.get(url).header(USER_AGENT, &ua).send().unwrap();
+            sleep(std::time::Duration::from_secs(2));
+            assert_eq!(init_resp.status(), 200, "testing useragents: ua - {}, url - {}", &ua, url);
+        }
     }
 }

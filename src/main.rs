@@ -2,6 +2,7 @@ mod config;
 mod error;
 mod interface;
 mod twitch;
+mod update;
 mod util;
 
 use clap::{crate_name, crate_version, Parser};
@@ -53,17 +54,10 @@ fn main() {
     }));
 
     match matches.command {
-        Some(sub) => {
-            let matches = Cli {
-                command: None,
-                ..matches
-            };
-
-            match sub.execute(matches) {
-                Ok(_) => {}
-                Err(e) => error!("{}", e),
-            }
-        }
+        Some(ref sub) => match sub.execute(matches.clone()) {
+            Ok(_) => {}
+            Err(e) => error!("{}", e),
+        },
         None => main_interface(matches),
     }
 }

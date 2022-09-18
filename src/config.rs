@@ -124,9 +124,19 @@ pub enum Commands {
         #[clap(short, long)]
         slow: bool,
     },
+
+    /// Check for updates
+    Update,
 }
 
 impl Commands {
+    pub fn show_description(&self) -> bool {
+        match self {
+            Self::Update => false,
+            _ => true,
+        }
+    }
+
     pub fn to_short_desc(&self) -> String {
         match self {
             Self::Exact { .. } => "Exact mode".to_string(),
@@ -136,21 +146,37 @@ impl Commands {
             Self::Clip { .. } => "Clip mode".to_string(),
             Self::Clipforce { .. } => "Clip bruteforce mode".to_string(),
             Self::Fix { .. } => "Fix playlist".to_string(),
+            Self::Update => "Check for updates".to_string(),
         }
     }
 
-    pub fn from_selector(s: usize) -> Option<Self> {
-        if s > 0 {
-            let s = s - 1;
-            match Self::VARIANTS.get(s) {
-                Some(a) => match Self::from_str(a) {
-                    Ok(e) => Some(e),
-                    Err(_) => None,
-                },
-                None => None,
+    pub fn to_selector(&self) -> Option<String> {
+        match self {
+            Self::Update => Some("u".to_string()),
+            _ => None,
+        }
+    }
+
+    pub fn from_selector(s: String) -> Option<Self> {
+        match s.parse::<usize>() {
+            Ok(s) => {
+                if s > 0 {
+                    let s = s - 1;
+                    match Self::VARIANTS.get(s) {
+                        Some(a) => match Self::from_str(a) {
+                            Ok(e) => Some(e),
+                            Err(_) => None,
+                        },
+                        None => None,
+                    }
+                } else {
+                    None
+                }
             }
-        } else {
-            None
+            Err(_) => match s.as_str() {
+                "u" => Some(Self::Update),
+                _ => None,
+            },
         }
     }
 }
